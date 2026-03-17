@@ -6,7 +6,7 @@ date: "2026-03-16"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
-  echo = TRUE,
+  echo = FALSE,
   warning = FALSE,
   message = FALSE,
   fig.width = 7,
@@ -33,13 +33,13 @@ This report uses linear regression because the response is continuous and the ma
 
 The raw dataset is stored locally in the project folder as `data/EV_cars.csv`. Using a relative file path makes the analysis reproducible for all group members and avoids machine-specific paths such as `~/Desktop/...`.
 
-```{r packages}
+```{r packages, include=FALSE}
 library(dplyr)
 library(ggplot2)
 library(knitr)
 ```
 
-```{r import-data}
+```{r import-data, include=FALSE}
 data_path <- "data/EV_cars.csv"
 ev_raw <- read.csv(data_path, header = TRUE, na.strings = c("NA", ""))
 
@@ -52,7 +52,7 @@ The raw file contains 360 observations and 9 recorded variables: `Battery`, `Car
 
 The next chunk creates a manufacturer variable from the vehicle name, constructs the premium/non-premium grouping from the proposal, renames the acceleration variable to a cleaner column name, and keeps the variables relevant to the analysis. Identifier variables such as `Car_name_link` are not used as predictors because they do not have an interpretable statistical relationship with price.
 
-```{r clean-data}
+```{r clean-data, include=FALSE}
 premium_brands <- c("Tesla", "BMW", "Audi", "Mercedes-Benz", "Mercedes", "Porsche")
 
 ev <- ev_raw %>%
@@ -88,7 +88,7 @@ nrow(ev)
 
 After removing rows with missing price, the main analysis dataset contains 309 EV models. A quick check of duplicate `Car_name` values shows that some names appear more than once. These rows were retained because they are not exact duplicates of the full record: for example, duplicate names can have different `Car_name_link` values and different charging specifications, suggesting separate listings or updated versions rather than accidental repetition.
 
-```{r data-checks}
+```{r data-checks, include=FALSE}
 ev_raw %>%
   summarise(
     n_raw = n(),
@@ -195,9 +195,9 @@ The correlation matrix also highlights why model selection is needed. Price is s
 
 The response is continuous, so a linear regression model is appropriate. The variables appearing explicitly in the research question, `Battery`, `market_segment`, and their interaction, remain in all candidate models. Additional quantitative variables are treated as optional controls and may be removed during model selection if they do not meaningfully improve the model.
 
-Following the course guidance for inference-focused projects, test-based or criteria-based model selection should be used rather than pure prediction-based selection. Here, the primary selection approach is backward elimination using partial F-tests on optional variables only, while keeping the research-question terms fixed in the model. AIC and BIC are then reported as supporting criteria for comparing candidate models.
+Following the course guidance for inference-focused projects, test-based or criteria-based model selection should be used rather than pure prediction-based selection. Here, the primary selection approach is backward elimination using partial F-tests on optional variables only, while keeping the research-question terms fixed in the model. AIC and BIC are then reported as supporting criteria for comparing candidate models. The final reported model in this report is the selected model, while the full model and the log-price model are used as supporting checks.
 
-## Full Model
+## Initial Full Model
 
 ```{r fit-full-model}
 full_model <- lm(
@@ -213,11 +213,11 @@ The coefficient of `Battery` estimates the battery-price association for the bas
 
 In the full model, the interaction term is positive and highly statistically significant (estimate about 628, p-value < 0.001), indicating that the battery-price association differs by segment even after controlling for the other vehicle characteristics. `Top_speed`, `Efficiency`, and `Fast_charge` are also statistically significant, while `Range` and `Acceleration_0_100` contribute less once the other variables are present. The full model has an adjusted \(R^2\) of about 0.731, so it explains a substantial proportion of the variation in listed price.
 
-## Backward Selection with Required Terms Retained
+## Model Selection
 
 The following function performs backward elimination using `drop1(..., test = "F")`. It only considers removing optional variables. The three research-question terms are always retained.
 
-```{r backward-selection-function}
+```{r backward-selection-function, include=FALSE}
 backward_keep_required <- function(data, response, required_terms, optional_terms, alpha = 0.05) {
   current_optional <- optional_terms
 
@@ -284,7 +284,18 @@ summary(final_model)
 
 Backward selection removed `Range` and `Acceleration_0_100`, while retaining `Efficiency`, `Top_speed`, and `Fast_charge` in addition to the required research-question terms. This matches the exploratory evidence of multicollinearity: once `Battery`, `Top_speed`, and the other retained controls are in the model, `Range` no longer provides much additional information. The selected model keeps the key interaction term and remains highly explanatory, with an adjusted \(R^2\) of about 0.729.
 
-## Criteria-Based Comparison of Candidate Models
+## Main Model Results
+
+The selected model removes `Range` and `Acceleration_0_100` while retaining `Efficiency`, `Top_speed`, and `Fast_charge` along with the required interaction structure. This is the main model used for interpretation because it is simpler than the full model and fits nearly as well.
+
+```{r coefficient-table}
+kable(round(summary(final_model)$coefficients, 4),
+      caption = "Coefficient estimates for the final regression model")
+```
+
+In the selected model, the estimated coefficient for `Battery` in the non-premium group is about 63 EUR per kWh and is not statistically significant on its own (p = 0.466). However, the interaction term is about 598 EUR per kWh and highly significant (p < 0.001), so the implied battery slope for premium vehicles is much steeper, about 661 EUR per kWh. This provides strong evidence that the battery-price relationship differs between premium and non-premium manufacturers after controlling for the retained technical variables. The coefficient on `market_segmentPremium` by itself is negative, but because that term is defined at a battery size of zero, it is not substantively meaningful on its own. The more relevant interpretation comes from the interaction and the fitted relationship: premium vehicles are priced differently and their prices rise more steeply with battery capacity.
+
+## Model Comparison
 
 Although the main model-selection argument should remain inference-focused, AIC and BIC can still be used as supporting evidence when comparing a small number of sensible candidate models.
 
@@ -305,9 +316,9 @@ data.frame(
 )
 ```
 
-The model comparison supports using the selected model. The battery-plus-segment-only model has a much lower adjusted \(R^2\) of about 0.564, so the additional controls clearly improve fit. The selected and full models have almost identical AIC values (6893.75 versus 6893.53) and very similar adjusted \(R^2\) values (0.729 versus 0.731). Because the full model improves fit only negligibly while using two additional variables, the selected model is the more parsimonious choice.
+The model comparison supports using the selected model. The battery-plus-segment-only model has a much lower adjusted \(R^2\) of about 0.564, so the additional controls clearly improve fit. The selected and full models have almost identical AIC values (6893.75 versus 6893.53) and very similar adjusted \(R^2\) values (0.729 versus 0.731). Because the full model improves fit only negligibly while using two additional variables, the selected model is the more parsimonious choice and is therefore the main model reported below.
 
-## Regression Diagnostics
+## Diagnostics and Sensitivity Check
 
 After selecting the final model, standard diagnostic checks should be performed. These checks help assess linearity, constant variance, approximate normality of residuals, and influential observations.
 
@@ -339,18 +350,7 @@ plot(log_model)
 par(mfrow = c(1, 1))
 ```
 
-The log-price sensitivity analysis fits somewhat better, with an adjusted \(R^2\) of about 0.841, which suggests that a transformation may help stabilize residual variation. Importantly, the central substantive result remains the same in the log model: the battery-by-segment interaction is still positive and highly significant. This makes the main conclusion more robust, even if the report ultimately presents the simpler untransformed model for ease of interpretation.
-
-## Reporting the Final Model
-
-Once the final model is chosen, report the coefficient table and interpret the coefficients in the context of the research questions.
-
-```{r coefficient-table}
-kable(round(summary(final_model)$coefficients, 4),
-      caption = "Coefficient estimates for the final regression model")
-```
-
-In the selected model, the estimated coefficient for `Battery` in the non-premium group is about 63 EUR per kWh and is not statistically significant on its own (p = 0.466). However, the interaction term is about 598 EUR per kWh and highly significant (p < 0.001), so the implied battery slope for premium vehicles is much steeper, about 661 EUR per kWh. This provides strong evidence that the battery-price relationship differs between premium and non-premium manufacturers after controlling for the retained technical variables. The coefficient on `market_segmentPremium` by itself is negative, but because that term is defined at a battery size of zero, it is not substantively meaningful on its own. The more relevant interpretation comes from the interaction and the fitted lines: premium vehicles are priced differently and their prices rise more steeply with battery capacity.
+The residual plots should be checked for strong departures from linearity, unequal spread, or unusually influential observations. In this dataset, the right-skewed price distribution makes a log-price sensitivity analysis useful as a secondary check. The log-price model fits somewhat better, with an adjusted \(R^2\) of about 0.841, which suggests that a transformation may help stabilize residual variation. Importantly, the central substantive result remains the same in the log model: the battery-by-segment interaction is still positive and highly significant. This makes the main conclusion more robust, even though the selected untransformed model remains the primary model because its coefficients are easier to interpret in euro units.
 
 # Discussion and Conclusion
 
