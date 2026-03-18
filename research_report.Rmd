@@ -27,9 +27,11 @@ The data come from the *Electric Vehicle Specifications and Prices* dataset obta
 
 The response variable is `Price.DE.`, the listed vehicle price in euros. The main explanatory variable is `Battery`, measured in kilowatt-hours (kWh). A second key variable is manufacturer segment, coded as premium or non-premium. Following the proposal, Tesla, BMW, Audi, Mercedes-Benz, and Porsche are classified as premium brands. Other quantitative variables that may be useful during model building include `Range`, `Efficiency`, `Top_speed`, `Acceleration..0.100.`, and `Fast_charge`.
 
-This report uses linear regression because the response is continuous and the main goal is inference about average relationships. In particular, including an interaction between battery capacity and market segment allows the battery-price relationship to differ between premium and non-premium manufacturers, which directly addresses the second research question. Based on the course material, variables named in the research question remain in the model throughout model selection even if other selection criteria would remove them.
+This report uses multiple linear regression because the response is continuous and the main goal is inference about average relationships. In particular, including an interaction between battery capacity and market segment allows the battery-price relationship to differ between premium and non-premium manufacturers, which directly addresses the second research question. Based on the course material, variables named in the research question remain in the model throughout model selection even if a selection procedure would otherwise remove them.
 
-# Data Import and Preparation
+# Exploratory Analysis
+
+## Data Preparation
 
 The raw dataset is stored locally in the project folder as `data/EV_cars.csv`. Using a relative file path makes the analysis reproducible for all group members and avoids machine-specific paths such as `~/Desktop/...`.
 
@@ -107,9 +109,9 @@ ev %>%
 
 For the main regression, one practical choice is to fit models using complete cases on the variables included in each model. If `Fast_charge` remains in a candidate model, the effective sample size becomes 307 rather than 309 because of the two missing charging values. This should be noted when comparing models.
 
-# Exploratory Analysis
+## Exploratory Summaries
 
-Exploratory analysis serves two purposes in this study. First, it helps describe the data to readers who are not familiar with the EV market. Second, it helps determine whether the assumptions of a linear regression model are plausible and whether any transformations or model simplifications should be considered.
+Exploratory analysis serves two purposes in this study. First, it helps describe the data to readers who are not familiar with the EV market. Second, it helps identify features of the data that affect the regression analysis, such as skewness, segment differences, and multicollinearity among technical variables.
 
 Start with summary statistics for the response and candidate explanatory variables.
 
@@ -132,27 +134,7 @@ kable(summary_table, digits = 2)
 
 Among the 309 EV models used in the main analysis, the mean listed price is about 67,264 EUR and the median price is 56,942 EUR, indicating some right-skew from a smaller number of high-priced vehicles. Battery capacity has a mean of 71.1 kWh and a median of 70.5 kWh, so the battery distribution is more balanced than the price distribution. When the sample is split by manufacturer segment, premium vehicles are clearly larger and more expensive on average: premium models have a mean price of about 94,359 EUR and a mean battery size of 84.0 kWh, compared with 55,418 EUR and 65.4 kWh for non-premium models.
 
-The distribution of price should be examined because strong right-skew or a few very expensive vehicles could affect both model fit and interpretation. The distribution of battery capacity should also be assessed to understand the range of the main predictor.
-
-```{r histograms}
-ggplot(ev, aes(x = Price.DE.)) +
-  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
-  labs(
-    title = "Distribution of EV Price in Germany",
-    x = "Price (EUR)",
-    y = "Count"
-  )
-
-ggplot(ev, aes(x = Battery)) +
-  geom_histogram(bins = 30, fill = "darkorange", color = "white") +
-  labs(
-    title = "Distribution of Battery Capacity",
-    x = "Battery capacity (kWh)",
-    y = "Count"
-  )
-```
-
-The price histogram shows noticeable right-skew, which is expected in a market where a small number of luxury and high-performance vehicles are much more expensive than the rest of the sample. The battery histogram is more concentrated, with many vehicles clustered in the mid-size battery range and fewer models at the smallest and largest battery capacities.
+The summary statistics already suggest two important features that matter for modeling: price is more variable and somewhat right-skewed, while premium vehicles tend to have both larger batteries and higher prices. This motivates focusing on the joint relationship between price, battery capacity, and market segment.
 
 The most important exploratory plot is the scatterplot of price against battery capacity, with separate fitted lines for premium and non-premium manufacturers. This directly addresses both research questions.
 
@@ -193,13 +175,13 @@ The correlation matrix also highlights why model selection is needed. Price is s
 
 ## Modeling Strategy
 
-The response is continuous, so a linear regression model is appropriate. The variables appearing explicitly in the research question, `Battery`, `market_segment`, and their interaction, remain in all candidate models. Additional quantitative variables are treated as optional controls and may be removed during model selection if they do not meaningfully improve the model.
+The response is continuous, so multiple linear regression is appropriate. The variables appearing explicitly in the research question, `Battery`, `market_segment`, and their interaction, remain in all candidate models. Additional quantitative variables are treated as optional controls and may be removed during model selection if they do not meaningfully improve the model.
 
-Following the course guidance for inference-focused projects, test-based or criteria-based model selection should be used rather than pure prediction-based selection. Here, the primary selection approach is backward elimination using partial F-tests on optional variables only, while keeping the research-question terms fixed in the model. AIC and BIC are then reported as supporting criteria for comparing candidate models. The final reported model in this report is the selected model, while the full model and the log-price model are used as supporting checks.
+Following the course guidance for inference-focused projects, the main selection approach used here is backward elimination based on partial F-tests for optional variables only, while keeping the research-question terms fixed in the model. This gives a simpler model without dropping the variables needed to answer the main questions of interest.
 
-## Initial Full Model
+## Initial Model
 
-```{r fit-full-model}
+```{r fit-full-model, include=FALSE}
 full_model <- lm(
   Price.DE. ~ Battery * market_segment +
     Range + Efficiency + Top_speed + Acceleration_0_100 + Fast_charge,
@@ -211,7 +193,7 @@ summary(full_model)
 
 The coefficient of `Battery` estimates the battery-price association for the baseline group, which is non-premium manufacturers. The coefficient of `market_segmentPremium` estimates the difference in intercept between premium and non-premium manufacturers. The interaction term `Battery:market_segmentPremium` estimates how much the battery-price slope differs for premium brands relative to non-premium brands.
 
-In the full model, the interaction term is positive and highly statistically significant (estimate about 628, p-value < 0.001), indicating that the battery-price association differs by segment even after controlling for the other vehicle characteristics. `Top_speed`, `Efficiency`, and `Fast_charge` are also statistically significant, while `Range` and `Acceleration_0_100` contribute less once the other variables are present. The full model has an adjusted \(R^2\) of about 0.731, so it explains a substantial proportion of the variation in listed price.
+The initial model includes the research-question terms and the additional quantitative variables considered plausible controls: `Range`, `Efficiency`, `Top_speed`, `Acceleration_0_100`, and `Fast_charge`. This serves as the starting point for the test-based model selection procedure.
 
 ## Model Selection
 
@@ -263,7 +245,7 @@ backward_keep_required <- function(data, response, required_terms, optional_term
 }
 ```
 
-```{r run-backward-selection}
+```{r run-backward-selection, include=FALSE}
 required_terms <- c("Battery", "market_segment", "Battery:market_segment")
 optional_terms <- c("Range", "Efficiency", "Top_speed", "Acceleration_0_100", "Fast_charge")
 
@@ -295,40 +277,17 @@ kable(round(summary(final_model)$coefficients, 4),
 
 In the selected model, the estimated coefficient for `Battery` in the non-premium group is about 63 EUR per kWh and is not statistically significant on its own (p = 0.466). However, the interaction term is about 598 EUR per kWh and highly significant (p < 0.001), so the implied battery slope for premium vehicles is much steeper, about 661 EUR per kWh. This provides strong evidence that the battery-price relationship differs between premium and non-premium manufacturers after controlling for the retained technical variables. The coefficient on `market_segmentPremium` by itself is negative, but because that term is defined at a battery size of zero, it is not substantively meaningful on its own. The more relevant interpretation comes from the interaction and the fitted relationship: premium vehicles are priced differently and their prices rise more steeply with battery capacity.
 
-## Model Comparison
-
-Although the main model-selection argument should remain inference-focused, AIC and BIC can still be used as supporting evidence when comparing a small number of sensible candidate models.
-
-```{r compare-models}
-model_battery_only <- lm(Price.DE. ~ Battery * market_segment, data = ev)
-model_selected <- final_model
-model_full <- full_model
-
-data.frame(
-  model = c("Battery + segment + interaction", "Selected model", "Full model"),
-  AIC = c(AIC(model_battery_only), AIC(model_selected), AIC(model_full)),
-  BIC = c(BIC(model_battery_only), BIC(model_selected), BIC(model_full)),
-  adj_R2 = c(
-    summary(model_battery_only)$adj.r.squared,
-    summary(model_selected)$adj.r.squared,
-    summary(model_full)$adj.r.squared
-  )
-)
-```
-
-The model comparison supports using the selected model. The battery-plus-segment-only model has a much lower adjusted \(R^2\) of about 0.564, so the additional controls clearly improve fit. The selected and full models have almost identical AIC values (6893.75 versus 6893.53) and very similar adjusted \(R^2\) values (0.729 versus 0.731). Because the full model improves fit only negligibly while using two additional variables, the selected model is the more parsimonious choice and is therefore the main model reported below.
-
 ## Diagnostics and Sensitivity Check
 
 After selecting the final model, standard diagnostic checks should be performed. These checks help assess linearity, constant variance, approximate normality of residuals, and influential observations.
 
-```{r diagnostics}
+```{r diagnostics, include=FALSE}
 par(mfrow = c(2, 2))
 plot(final_model)
 par(mfrow = c(1, 1))
 ```
 
-```{r influence-check}
+```{r influence-check, include=FALSE}
 plot(cooks.distance(final_model), type = "h",
      main = "Cook's Distance for Final Model",
      ylab = "Cook's distance")
@@ -337,7 +296,7 @@ abline(h = 4 / nrow(ev), col = "red", lty = 2)
 
 If the residual plots show strong heteroscedasticity or right-skewed residuals, a log transformation of price may be worth considering. The transformed model should only be adopted if diagnostics clearly improve and the interpretation remains appropriate for the study objective.
 
-```{r optional-log-model}
+```{r optional-log-model, include=FALSE}
 log_model <- lm(
   log(Price.DE.) ~ Battery * market_segment +
     Range + Efficiency + Top_speed + Acceleration_0_100 + Fast_charge,
@@ -350,7 +309,7 @@ plot(log_model)
 par(mfrow = c(1, 1))
 ```
 
-The residual plots should be checked for strong departures from linearity, unequal spread, or unusually influential observations. In this dataset, the right-skewed price distribution makes a log-price sensitivity analysis useful as a secondary check. The log-price model fits somewhat better, with an adjusted \(R^2\) of about 0.841, which suggests that a transformation may help stabilize residual variation. Importantly, the central substantive result remains the same in the log model: the battery-by-segment interaction is still positive and highly significant. This makes the main conclusion more robust, even though the selected untransformed model remains the primary model because its coefficients are easier to interpret in euro units.
+The residual plots should be checked for strong departures from linearity, unequal spread, or unusually influential observations. In this dataset, the right-skewed price distribution makes a log-price model worth considering as a secondary check. The log-price model fits somewhat better, with an adjusted \(R^2\) of about 0.841, and the battery-by-segment interaction remains positive and highly significant. This suggests that the main conclusion is robust, even though the selected untransformed model remains the primary model because its coefficients are easier to interpret in euro units.
 
 # Discussion and Conclusion
 
@@ -372,8 +331,21 @@ Generative AI was used to help organize this report draft and convert the projec
 
 ## Notes on Course Alignment
 
-The modeling strategy in this report is aligned with the course guidance from the provided lecture material:
+The methods used in the main report are limited to those covered in the course and are chosen because they directly address the data and research questions:
 
-- Interaction terms are used because the research question asks whether the battery-price relationship differs by manufacturer segment.
-- Model selection is treated as an inference problem, so the main procedure uses test-based or criteria-based comparison rather than purely predictive methods.
-- Variables named directly in the research question remain in the model throughout selection.
+- exploratory summaries and a scatterplot with fitted lines
+- multiple linear regression with an interaction between a quantitative and a categorical variable
+- backward model selection based on partial F-tests for optional variables
+- standard residual diagnostics for the chosen model
+- an optional log transformation of the response as a secondary diagnostic check
+
+## Additional Supporting Details
+
+The main body reports only the outputs most relevant to the research questions in order to stay concise. Additional steps used in the analysis include:
+
+- checking missingness and duplicate model names during data preparation
+- fitting the initial full model before model selection
+- examining residual and influence diagnostics
+- fitting a log-price sensitivity model to assess whether transformation changes the main conclusions
+
+These supporting analyses inform the final model choice, but the key findings and interpretations are presented in the main body of the report.
