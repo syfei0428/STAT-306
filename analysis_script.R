@@ -75,6 +75,23 @@ quant_vars <- ev %>%
   )
 print(round(cor(quant_vars, use = "complete.obs"), 2))
 
+pairs_data <- quant_vars
+colnames(pairs_data) <- c(
+  "Price",
+  "Battery",
+  "Range",
+  "Efficiency",
+  "Top speed",
+  "0-100 accel",
+  "Fast charge"
+)
+
+pairs(
+  pairs_data,
+  pch = 19,
+  cex = 0.5
+)
+
 full_model <- lm(
   Price.DE. ~ Battery * market_segment +
     Range + Efficiency + Top_speed + Acceleration_0_100 + Fast_charge,

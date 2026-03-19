@@ -118,18 +118,22 @@ Start with summary statistics for the response and candidate explanatory variabl
 ```{r summary-table}
 summary_table <- ev %>%
   summarise(
-    n = n(),
-    mean_price = mean(Price.DE., na.rm = TRUE),
-    median_price = median(Price.DE., na.rm = TRUE),
-    sd_price = sd(Price.DE., na.rm = TRUE),
-    mean_battery = mean(Battery, na.rm = TRUE),
-    median_battery = median(Battery, na.rm = TRUE),
-    sd_battery = sd(Battery, na.rm = TRUE),
-    mean_range = mean(Range, na.rm = TRUE),
-    mean_efficiency = mean(Efficiency, na.rm = TRUE)
+    N = n(),
+    `Mean price` = mean(Price.DE., na.rm = TRUE),
+    `Median price` = median(Price.DE., na.rm = TRUE),
+    `SD price` = sd(Price.DE., na.rm = TRUE),
+    `Mean battery` = mean(Battery, na.rm = TRUE),
+    `Median battery` = median(Battery, na.rm = TRUE),
+    `SD battery` = sd(Battery, na.rm = TRUE),
+    `Mean range` = mean(Range, na.rm = TRUE),
+    `Mean efficiency` = mean(Efficiency, na.rm = TRUE)
   )
 
-kable(summary_table, digits = 2)
+kable(
+  summary_table,
+  digits = 2,
+  caption = "Summary statistics for key quantitative variables"
+)
 ```
 
 Among the 309 EV models used in the main analysis, the mean listed price is about 67,264 EUR and the median price is 56,942 EUR, indicating some right-skew from a smaller number of high-priced vehicles. Battery capacity has a mean of 71.1 kWh and a median of 70.5 kWh, so the battery distribution is more balanced than the price distribution. When the sample is split by manufacturer segment, premium vehicles are clearly larger and more expensive on average: premium models have a mean price of about 94,359 EUR and a mean battery size of 84.0 kWh, compared with 55,418 EUR and 65.4 kWh for non-premium models.
@@ -166,7 +170,8 @@ quant_vars <- ev %>%
     Fast_charge
   )
 
-round(cor(quant_vars, use = "complete.obs"), 2)
+correlation_table <- round(cor(quant_vars, use = "complete.obs"), 2)
+kable(correlation_table, caption = "Correlation matrix for quantitative variables")
 ```
 
 The correlation matrix also highlights why model selection is needed. Price is strongly positively correlated with `Battery` (0.70) and `Top_speed` (0.76), while `Battery` and `Range` are themselves highly correlated (0.88). `Top_speed` and `Acceleration_0_100` are also strongly associated in magnitude, with a correlation of -0.84 because faster vehicles have lower acceleration times. These patterns suggest substantial overlap among the technical variables, so a simpler regression model is preferable for interpretation.
@@ -349,3 +354,38 @@ The main body reports only the outputs most relevant to the research questions i
 - fitting a log-price sensitivity model to assess whether transformation changes the main conclusions
 
 These supporting analyses inform the final model choice, but the key findings and interpretations are presented in the main body of the report.
+
+## Pairwise Relationships Among Quantitative Variables
+
+As an additional exploratory check, the following scatterplot matrix summarizes pairwise relationships among the quantitative variables used in the analysis. This is included in the appendix rather than the main body because it is useful for supporting model-building decisions, but it is not the most direct figure for answering the research questions.
+
+```{r pairs-plot}
+pairs_data <- ev %>%
+  select(
+    Price.DE.,
+    Battery,
+    Range,
+    Efficiency,
+    Top_speed,
+    Acceleration_0_100,
+    Fast_charge
+  )
+
+colnames(pairs_data) <- c(
+  "Price",
+  "Battery",
+  "Range",
+  "Efficiency",
+  "Top speed",
+  "0-100 accel",
+  "Fast charge"
+)
+
+pairs(
+  pairs_data,
+  pch = 19,
+  cex = 0.5
+)
+```
+
+This plot is mainly helpful for visually checking which explanatory variables appear strongly associated with price and which predictors appear highly related to one another. In this dataset, it supports the conclusion that variables such as `Battery`, `Range`, `Top_speed`, and `Fast_charge` share substantial overlap, which helps explain why a simpler final model is preferred.
