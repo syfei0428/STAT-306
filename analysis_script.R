@@ -38,9 +38,36 @@ cat("Missing prices in raw data:", sum(is.na(ev_raw$Price.DE.)), "\n")
 cat("Missing fast charge values in raw data:", sum(is.na(ev_raw$Fast_charge)), "\n")
 print(table(ev$market_segment))
 
+ev_missing_check <- ev_raw %>%
+  mutate(
+    manufacturer = sub(" .*", "", Car_name),
+    manufacturer = ifelse(manufacturer == "Mercedes-Benz", "Mercedes-Benz", manufacturer),
+    market_segment = ifelse(manufacturer %in% premium_brands, "Premium", "Non-premium"),
+    price_missing = is.na(Price.DE.),
+    Acceleration_0_100 = acceleration..0.100.
+  )
+
+missing_price_comparison <- ev_missing_check %>%
+  group_by(price_missing) %>%
+  summarise(
+    mean_battery = mean(Battery, na.rm = TRUE),
+    median_battery = median(Battery, na.rm = TRUE),
+    mean_range = mean(Range, na.rm = TRUE),
+    median_range = median(Range, na.rm = TRUE),
+    mean_efficiency = mean(Efficiency, na.rm = TRUE),
+    mean_top_speed = mean(Top_speed, na.rm = TRUE),
+    mean_acceleration = mean(Acceleration_0_100, na.rm = TRUE),
+    mean_fast_charge = mean(Fast_charge, na.rm = TRUE)
+  )
+
+cat("\nComparison of models with and without missing prices\n")
+print(missing_price_comparison)
+cat("\nMarket segment by price missingness\n")
+print(table(ev_missing_check$market_segment, ev_missing_check$price_missing))
+
 summary_table <- ev %>%
   summarise(
-    n = n(),
+    N = n(),
     mean_price = mean(Price.DE., na.rm = TRUE),
     median_price = median(Price.DE., na.rm = TRUE),
     sd_price = sd(Price.DE., na.rm = TRUE),

@@ -25,7 +25,7 @@ This report studies EV models listed for sale in Germany and investigates whethe
 
 The data come from the *Electric Vehicle Specifications and Prices* dataset obtained from Kaggle and compiled by web scraping EV Database. EV Database aggregates manufacturer-reported technical specifications and listed prices for electric vehicle models listed for sale in Germany. The Kaggle dataset page indicates that the dataset entry was updated "2 years ago," which provides some background on when the posted dataset was last refreshed. However, that platform update note should not be interpreted as a precise statement of the model year coverage or the exact scrape date of the underlying EV listings. The dataset contains 360 observations, where each row represents a distinct EV model. This dataset should not be interpreted as a complete census of all electric vehicles that have ever existed or all EVs ever sold in Germany. Instead, it is best understood as a snapshot of the EV models included in EV Database when the source was scraped and the Kaggle dataset was assembled. The exact calendar year or scrape date is not stated in the raw CSV used here, so the report avoids treating the data as representing a single fully specified year. Since the data are observational rather than experimental, all conclusions in this report are associative rather than causal.
 
-The response variable is `Price.DE.`, the listed vehicle price in euros. The main explanatory variable is `Battery`, measured in kilowatt-hours (kWh). A second key variable is manufacturer segment, coded as premium or non-premium. Following the proposal, Tesla, BMW, Audi, Mercedes-Benz, and Porsche are classified as premium brands. Other quantitative variables that may be useful during model building include `Range`, `Efficiency`, `Top_speed`, `Acceleration..0.100.`, and `Fast_charge`.
+The response variable is `Price.DE.`, the listed vehicle price in euros. The main explanatory variable is `Battery`, measured in kilowatt-hours (kWh). A second key variable is manufacturer segment, coded as premium or non-premium. Following the proposal, Tesla, BMW, Audi, Mercedes-Benz, and Porsche are classified as premium brands based on their widely recognized positioning in the European automotive market. This grouping is intended to reflect broad brand-tier differences rather than a formal regulatory classification. Other quantitative variables that may be useful during model building include `Range`, `Efficiency`, `Top_speed`, `Acceleration..0.100.`, and `Fast_charge`.
 
 This report uses multiple linear regression because the response is continuous and the main goal is inference about average relationships. In particular, including an interaction between battery capacity and market segment allows the battery-price relationship to differ between premium and non-premium manufacturers, which directly addresses the second research question. Based on the course material, variables named in the research question remain in the model throughout model selection even if a selection procedure would otherwise remove them.
 
@@ -107,7 +107,7 @@ ev %>%
   arrange(desc(n), Car_name)
 ```
 
-For the main regression, one practical choice is to fit models using complete cases on the variables included in each model. If `Fast_charge` remains in a candidate model, the effective sample size becomes 307 rather than 309 because of the two missing charging values. This should be noted when comparing models.
+For the main regression, one practical choice is to fit models using complete cases on the variables included in each model. If `Fast_charge` remains in a candidate model, the effective sample size becomes 307 rather than 309 because of the two missing charging values. This should be noted when comparing models. The 51 models with missing prices do not appear dramatically different from the retained models in terms of battery capacity, range, efficiency, top speed, acceleration, or fast-charge capability, which reduces concern that the missing prices are concentrated only among very low-end or very high-end vehicles. However, because the missingness mechanism is not known, some selection bias remains possible.
 
 ## Exploratory Summaries
 
@@ -142,7 +142,7 @@ The summary statistics already suggest two important features that matter for mo
 
 The most important exploratory plot is the scatterplot of price against battery capacity, with separate fitted lines for premium and non-premium manufacturers. This directly addresses both research questions.
 
-```{r scatter-by-segment}
+```{r scatter-by-segment, fig.cap="Price versus battery capacity by market segment"}
 ggplot(ev, aes(x = Battery, y = Price.DE., color = market_segment)) +
   geom_point(alpha = 0.7) +
   geom_smooth(method = "lm", se = FALSE) +
@@ -280,7 +280,7 @@ kable(round(summary(final_model)$coefficients, 4),
       caption = "Coefficient estimates for the final regression model")
 ```
 
-In the selected model, the baseline group is non-premium vehicles. The estimated coefficient for `Battery` in that group is about 63 EUR per kWh and is not statistically significant on its own (p = 0.466). The interaction term represents the difference in battery-price slope between premium and non-premium vehicles, and its estimate is about 598 EUR per kWh with p < 0.001. The estimated battery-price slope for premium vehicles is therefore \(63 + 598 \approx 661\) EUR per kWh. These results provide strong evidence that the battery-price relationship differs between premium and non-premium manufacturers after controlling for the retained technical variables. The intercept is negative, but it has no practical interpretation because no vehicle in the dataset has zero battery capacity; it is a mathematical artifact of the linear model. The coefficient on `market_segmentPremium` by itself is also defined at a battery size of zero and is therefore not substantively meaningful on its own. The more relevant interpretation comes from the interaction and the fitted relationship: premium vehicles are priced differently and their prices rise more steeply with battery capacity. The lack of significance of `Battery` in the non-premium group may also suggest that battery capacity is partly reflected through other retained performance-related variables, especially `Top_speed`.
+In the selected model, the baseline group is non-premium vehicles. The estimated coefficient for `Battery` in that group is about 63 EUR per kWh and is not statistically significant on its own (p = 0.466). The interaction term represents the difference in battery-price slope between premium and non-premium vehicles, and its estimate is about 598 EUR per kWh with p < 0.001. The estimated battery-price slope for premium vehicles is therefore \(63 + 598 \approx 661\) EUR per kWh. These results provide strong evidence that the battery-price relationship differs between premium and non-premium manufacturers after controlling for the retained technical variables. The intercept is negative, but it has no practical interpretation because no vehicle in the dataset has zero battery capacity; it is a mathematical artifact of the linear model. The coefficient on `market_segmentPremium` by itself is also defined at a battery size of zero and is therefore not substantively meaningful on its own. The more relevant interpretation comes from the interaction and the fitted relationship: premium vehicles are priced differently and their prices rise more steeply with battery capacity. Although the non-premium battery coefficient is small relative to the premium slope and is not statistically significant, its practical meaning is still worth considering: for example, a 40 kWh increase would correspond to about 2,520 EUR under this estimate. One plausible explanation for the weak statistical evidence is that prices for non-premium vehicles may be driven more by standardized model tiers and bundled performance features than by battery capacity alone. The lack of significance of `Battery` in the non-premium group may also suggest that battery capacity is partly reflected through other retained performance-related variables, especially `Top_speed`.
 
 ## Diagnostics and Sensitivity Check
 
@@ -314,7 +314,7 @@ plot(log_model)
 par(mfrow = c(1, 1))
 ```
 
-Diagnostic plots were examined for nonlinearity, non-constant variance, and influential observations. The residual-versus-fitted plot did not show strong curvature, and the normal Q-Q plot did not indicate severe departures from normality. However, the spread of residuals appears to increase somewhat for larger fitted values, which suggests mild heteroscedasticity. For this reason, a log-price model was considered as a secondary check. The log-price model fits somewhat better, with an adjusted \(R^2\) of about 0.841, and the battery-by-segment interaction remains positive and highly significant. Although the log-price model improves fit and likely reduces heteroscedasticity, the untransformed model is retained as the primary model because its coefficients can be interpreted directly in EUR, which is more meaningful for addressing the research questions.
+Diagnostic plots were examined for nonlinearity, non-constant variance, and influential observations. The residual-versus-fitted plot did not show strong curvature, and the normal Q-Q plot did not indicate severe departures from normality. However, the spread of residuals appears to increase somewhat for larger fitted values, which suggests mild heteroscedasticity. Supporting diagnostic plots are provided in the appendix. For this reason, a log-price model was considered as a secondary check. The log-price model fits somewhat better, with an adjusted \(R^2\) of about 0.841, and the battery-by-segment interaction remains positive and highly significant. More importantly, the substantive conclusion is the same in both models: the battery-price relationship is much stronger for premium vehicles than for non-premium vehicles. Although the log-price model improves fit and likely reduces heteroscedasticity, the untransformed model is retained as the primary model because its coefficients can be interpreted directly in EUR, which is more meaningful for addressing the research questions.
 
 # Discussion and Conclusion
 
@@ -355,11 +355,28 @@ The main body reports only the outputs most relevant to the research questions i
 
 These supporting analyses inform the final model choice, but the key findings and interpretations are presented in the main body of the report.
 
+## Diagnostic Plots
+
+The following plots provide supporting evidence for the model-diagnostic statements made in the statistical analysis section.
+
+```{r appendix-diagnostics, fig.cap="Diagnostic plots for the selected regression model"}
+par(mfrow = c(2, 2))
+plot(final_model)
+par(mfrow = c(1, 1))
+```
+
+```{r appendix-influence, fig.cap="Cook's distance for the selected regression model"}
+plot(cooks.distance(final_model), type = "h",
+     main = "Cook's Distance for Final Model",
+     ylab = "Cook's distance")
+abline(h = 4 / nrow(ev), col = "red", lty = 2)
+```
+
 ## Pairwise Relationships Among Quantitative Variables
 
 As an additional exploratory check, the following scatterplot matrix summarizes pairwise relationships among the quantitative variables used in the analysis. This is included in the appendix rather than the main body because it is useful for supporting model-building decisions, but it is not the most direct figure for answering the research questions.
 
-```{r pairs-plot}
+```{r pairs-plot, fig.cap="Scatterplot matrix for quantitative variables used in the analysis"}
 pairs_data <- ev %>%
   select(
     Price.DE.,
@@ -389,3 +406,14 @@ pairs(
 ```
 
 This plot is mainly helpful for visually checking which explanatory variables appear strongly associated with price and which predictors appear highly related to one another. In this dataset, it supports the conclusion that variables such as `Battery`, `Range`, `Top_speed`, and `Fast_charge` share substantial overlap, which helps explain why a simpler final model is preferred.
+
+## AI Prompts Used
+
+The following prompts were used to assist with drafting and organizing the report:
+
+1. "Based on the files in the doc, can you help me write the research report? ... Based on my research question inside the doc, help me write the doc in markdown format, just write them in current markdown file."
+2. "Use the knowledge we have learned, and write it similar to the qmd format, including R code for all analysis."
+3. "I just put the data inside the data folder, based on the raw data, can you help me update my report, including data treatment/preparation step."
+4. "Based on the report and results, help me double check the markdown file and update the file, especially for the results part based on graph."
+5. "Help me organize the research report in this structure ... try to make them concisely, if extra information useful, move them to appendix."
+6. "According to this feedback, help me revise the report." 
