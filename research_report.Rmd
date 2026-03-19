@@ -52,7 +52,7 @@ head(ev_raw)
 
 The raw file contains 360 observations and 9 recorded variables: `Battery`, `Car_name`, `Car_name_link`, `Efficiency`, `Fast_charge`, `Price.DE.`, `Range`, `Top_speed`, and `acceleration..0.100.`. Because the data were scraped from an online database, the observed models reflect what EV Database included during the underlying collection period, not necessarily every EV available in the German market before or after that time. This matters for interpretation: the analysis is best understood as describing relationships among the EV models represented in this snapshot, rather than all EVs from a specific stated year. The response variable `Price.DE.` has 51 missing values, and `Fast_charge` has 2 missing values. Since price is the response, rows with missing price cannot be used for the regression analysis and are removed. The two rows with missing `Fast_charge` are retained during initial cleaning and are only excluded in models that include `Fast_charge`.
 
-The next chunk creates a manufacturer variable from the vehicle name, constructs the premium/non-premium grouping from the proposal, renames the acceleration variable to a cleaner column name, and keeps the variables relevant to the analysis. Identifier variables such as `Car_name_link` are not used as predictors because they do not have an interpretable statistical relationship with price.
+To prepare the analysis dataset, a manufacturer variable was extracted from the vehicle name, the premium/non-premium grouping from the proposal was applied, the acceleration variable was renamed to a cleaner label, and only the variables relevant to the analysis were retained. Identifier variables such as `Car_name_link` were not used as predictors because they do not have an interpretable statistical relationship with price.
 
 ```{r clean-data, include=FALSE}
 premium_brands <- c("Tesla", "BMW", "Audi", "Mercedes-Benz", "Mercedes", "Porsche")
@@ -202,7 +202,7 @@ The initial model includes the research-question terms and the additional quanti
 
 ## Model Selection
 
-The following function performs backward elimination using `drop1(..., test = "F")`. It only considers removing optional variables. The three research-question terms are always retained.
+Backward elimination was implemented using partial F-tests through `drop1(..., test = "F")`. Only optional variables were considered for removal, while the three terms tied directly to the research questions were retained throughout the selection process.
 
 ```{r backward-selection-function, include=FALSE}
 backward_keep_required <- function(data, response, required_terms, optional_terms, alpha = 0.05) {
@@ -330,7 +330,7 @@ Overall, the analysis supports the conclusion that battery capacity is related t
 
 # Statement of AI Use
 
-Generative AI was used to help organize this report draft and convert the project plan into a reproducible markdown document with R code for data cleaning, exploratory analysis, regression modeling, model selection, and diagnostics. The statistical conclusions, numerical results, and model interpretations should be based only on the output produced from the actual dataset after the code is run.
+Generative AI was used to help organize the structure and wording of this report and to assist in preparing a separate reproducible analysis script. The statistical conclusions, numerical results, and model interpretations are based on outputs generated from the dataset itself.
 
 # Appendix
 
