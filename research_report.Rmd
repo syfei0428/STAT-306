@@ -407,13 +407,3 @@ pairs(
 
 This plot is mainly helpful for visually checking which explanatory variables appear strongly associated with price and which predictors appear highly related to one another. In this dataset, it supports the conclusion that variables such as `Battery`, `Range`, `Top_speed`, and `Fast_charge` share substantial overlap, which helps explain why a simpler final model is preferred.
 
-## AI Prompts Used
-
-The following prompts were used to assist with drafting and organizing the report:
-
-1. "Based on the files in the doc, can you help me write the research report? ... Based on my research question inside the doc, help me write the doc in markdown format, just write them in current markdown file."
-2. "Use the knowledge we have learned, and write it similar to the qmd format, including R code for all analysis."
-3. "I just put the data inside the data folder, based on the raw data, can you help me update my report, including data treatment/preparation step."
-4. "Based on the report and results, help me double check the markdown file and update the file, especially for the results part based on graph."
-5. "Help me organize the research report in this structure ... try to make them concisely, if extra information useful, move them to appendix."
-6. "According to this feedback, help me revise the report." 
