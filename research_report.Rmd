@@ -120,7 +120,7 @@ For the main regression, one practical choice is to fit models using complete ca
 
 Exploratory analysis serves two purposes in this study. First, it helps describe the data to readers who are not familiar with the EV market. Second, it helps identify features of the data that affect the regression analysis, such as skewness, segment differences, and multicollinearity among technical variables.
 
-Start with summary statistics for the response and candidate explanatory variables.
+Start with summary statistics (Table 1) for the response and candidate explanatory variables.
 
 ```{r summary-table}
 summary_table <- ev %>%
@@ -142,11 +142,11 @@ kable(
   caption = "Summary statistics for key quantitative variables"
 )
 ```
-(Table 1) reports summary statistics for the 309 EV models used in the main analysis. The mean listed price is 67,264 EUR, while the median price is 56,942 EUR, suggesting some right-skewness caused by a smaller number of high-priced vehicles. Battery capacity is more balanced, with a mean of 71.1 kWh and a median of 70.5 kWh. (Table 1) also shows clear differences across market segments. Premium vehicles are larger and more expensive on average: premium models have a mean price of about 94,359 EUR and a mean battery capacity of 84.0 kWh, compared with 55,418 EUR and 65.4 kWh for non-premium models. Overall, (Table 1) suggests that price is more variable than battery capacity, and that premium status is associated with both larger batteries and higher prices. These patterns motivate examining the joint relationship between price, battery capacity, and market segment in the regression analysis.
+The 309 EV models used in the main analysis have a mean listed price of 67,264 EUR and a median price of 56,942 EUR, suggesting some right-skewness caused by a smaller number of high-priced vehicles (Table 1). Battery capacity is more balanced, with a mean of 71.1 kWh and a median of 70.5 kWh. Clear differences also appear across market segments: premium vehicles are larger and more expensive on average, with a mean price of about 94,359 EUR and a mean battery capacity of 84.0 kWh, compared with 55,418 EUR and 65.4 kWh for non-premium models (Table 1). Overall, the summary statistics indicate that price is more variable than battery capacity and that premium status is associated with both larger batteries and higher prices. These patterns motivate examining the joint relationship between price, battery capacity, and market segment in the regression analysis.
 
 The summary statistics already suggest two important features that matter for modeling: price is more variable and somewhat right-skewed, while premium vehicles tend to have both larger batteries and higher prices. This motivates focusing on the joint relationship between price, battery capacity, and market segment.
 
-(Figure 1) presents the most important exploratory visualization in the report: a scatterplot of price against battery capacity, with separate fitted lines for premium and non-premium manufacturers. This figure directly addresses both research questions by showing both the overall battery–price association and the extent to which that association may differ by market segment.
+The main exploratory visualization plots price against battery capacity with separate fitted lines for premium and non-premium manufacturers (Figure 1). This figure directly addresses both research questions by showing both the overall battery-price association and the extent to which that association may differ by market segment.
 
 ```{r scatter-by-segment, fig.cap="Price versus battery capacity by market segment", fig.pos="H"}
 ggplot(ev, aes(x = Battery, y = Price.DE., color = market_segment)) +
@@ -160,7 +160,7 @@ ggplot(ev, aes(x = Battery, y = Price.DE., color = market_segment)) +
   )
 ```
 
-(Table 2) provides a numerical summary of the fitted relationships shown in (Figure 1) by reporting the slope estimates from separate simple linear regressions within each market segment. For non-premium vehicles, the estimated increase in price is 896.68 EUR per additional kWh of battery capacity, with a standard error of 57.47. For premium vehicles, the corresponding estimate is substantially larger at 1,355.14 EUR per kWh, with a standard error of 222.63. In both segments, the p-values are smaller than 0.001, indicating strong statistical evidence of a positive association between battery capacity and price. Consistent with the visual pattern in Figure 1, Table 2 confirms that while the relationship is positive for both segments, it is noticeably steeper among premium manufacturers. This suggests that an additional unit of battery capacity is associated with a larger price increase in the premium segment.
+Separate simple linear regressions of price on battery capacity were fitted within each market segment, and the resulting slope estimates are reported in Table 2. For non-premium vehicles, the estimated increase in price is 896.68 EUR per additional kWh of battery capacity, with a standard error of 57.47. For premium vehicles, the corresponding estimate is substantially larger at 1,355.14 EUR per kWh, with a standard error of 222.63. In both segments, the p-values are smaller than 0.001, indicating strong statistical evidence of a positive association between battery capacity and price. Consistent with the visual pattern in Figure 1, these estimates confirm that while the relationship is positive for both segments, it is noticeably steeper among premium manufacturers. This suggests that, on average, an additional kWh of battery capacity is associated with a larger increase in listed price in the premium segment.
 
 ```{r, echo=FALSE}
 model_nonpremium <- lm(Price.DE. ~ Battery,
@@ -179,12 +179,17 @@ slope_table <- bind_rows(
                      "<0.001",
                      format(p.value, scientific = TRUE, digits = 2))
   ) %>%
-  select(segment, estimate, std.error, p.value)
+  transmute(
+    Segment = segment,
+    `Slope estimate (EUR/kWh)` = estimate,
+    `Standard error` = std.error,
+    `p-value` = p.value
+  )
 
 kable(slope_table,
       digits = 2,
       booktabs = TRUE,
-      caption = "Estimated association between battery capacity and price by market segment")
+      caption = "Estimated battery-price relationship by market segment")
 ```
 
 Because several quantitative vehicle characteristics may be related to one another, it is also useful to examine pairwise relationships and correlations. This can help identify potential multicollinearity before model fitting.
@@ -205,7 +210,7 @@ correlation_table <- round(cor(quant_vars, use = "complete.obs"), 2)
 kable(correlation_table, caption = "Correlation matrix for quantitative variables")
 ```
 
-(Table 3) reports the correlation matrix for the main quantitative vehicle characteristics and provides insight into potential multicollinearity. Several strong pairwise relationships are evident. Price is strongly positively correlated with Battery (0.70) and Top_speed (0.76), indicating that more expensive vehicles tend to have larger batteries and higher performance. At the same time, Battery and Range are themselves highly correlated (0.88), suggesting that these variables capture similar underlying information about vehicle capability. In addition, Top_speed and Acceleration_0_100 are strongly negatively correlated (-0.84), reflecting the fact that faster vehicles tend to have lower acceleration times. Overall, (Table 3) reveals substantial dependence among the technical variables. These patterns suggest that including many of these predictors simultaneously may introduce multicollinearity, which can make regression coefficients unstable and harder to interpret. This supports the use of a more parsimonious model specification in the subsequent analysis. The broader pairwise relationships among the quantitative variables are shown in Appendix (Figure 4).
+Potential multicollinearity can be assessed from the correlation matrix of the main quantitative vehicle characteristics (Table 3). Several strong pairwise relationships are evident. Price is strongly positively correlated with Battery (0.70) and Top_speed (0.76), indicating that more expensive vehicles tend to have larger batteries and higher performance. At the same time, Battery and Range are themselves highly correlated (0.88), suggesting that these variables capture similar underlying information about vehicle capability. In addition, Top_speed and Acceleration_0_100 are strongly negatively correlated (-0.84), reflecting the fact that faster vehicles tend to have lower acceleration times. Overall, these correlations reveal substantial dependence among the technical variables. This suggests that including many of these predictors simultaneously may introduce multicollinearity, which can make regression coefficients unstable and harder to interpret. The broader pairwise relationships among the quantitative variables are shown in Appendix Figure 4.
 
 # Statistical Analysis
 
@@ -311,7 +316,7 @@ kable(round(summary(final_model)$coefficients, 4),
       caption = "Coefficient estimates for the final regression model")
 ```
 
-In the selected model, the baseline group is non-premium vehicles. The estimated coefficient for `Battery` in that group is about 63 EUR per kWh and is not statistically significant on its own (p = 0.466). The interaction term represents the difference in battery-price slope between premium and non-premium vehicles, and its estimate is about 598 EUR per kWh with p < 0.001. The estimated battery-price slope for premium vehicles is therefore \(63 + 598 \approx 661\) EUR per kWh. These results provide strong evidence that the battery-price relationship differs between premium and non-premium manufacturers after controlling for the retained technical variables. The intercept is negative, but it has no practical interpretation because no vehicle in the dataset has zero battery capacity; it is a mathematical artifact of the linear model. The coefficient on `market_segmentPremium` by itself is also defined at a battery capacity of zero and is therefore not substantively meaningful on its own. The more relevant interpretation comes from the interaction and the fitted relationship: premium vehicles are priced differently and their prices rise more steeply with battery capacity. Although the non-premium battery coefficient is small relative to the premium slope and is not statistically significant, its practical meaning is still worth considering: for example, a 40 kWh increase would correspond to about 2,520 EUR under this estimate. One plausible explanation for the weak statistical evidence is that prices for non-premium vehicles may be driven more by standardized model tiers and bundled performance features than by battery capacity alone, or that the within-segment relationship is estimated with greater variability once the other technical controls are included. The lack of significance of `Battery` in the non-premium group may also suggest that battery capacity is partly reflected through other retained performance-related variables, especially `Top_speed`.
+Coefficient estimates from the selected model are reported in Table 4. In the selected model, the baseline group is non-premium vehicles. The estimated coefficient for `Battery` in that group is about 63 EUR per kWh and is not statistically significant on its own (p = 0.466). The interaction term represents the difference in battery-price slope between premium and non-premium vehicles, and its estimate is about 598 EUR per kWh with p < 0.001. The estimated battery-price slope for premium vehicles is therefore \(63 + 598 \approx 661\) EUR per kWh. These results provide strong evidence that the battery-price relationship differs between premium and non-premium manufacturers after controlling for the retained technical variables. The intercept is negative, but it has no practical interpretation because no vehicle in the dataset has zero battery capacity; it is a mathematical artifact of the linear model. The coefficient on `market_segmentPremium` by itself is also defined at a battery capacity of zero and is therefore not substantively meaningful on its own. The more relevant interpretation comes from the interaction and the fitted relationship: premium vehicles are priced differently and their prices rise more steeply with battery capacity. Although the non-premium battery coefficient is small relative to the premium slope and is not statistically significant, its practical meaning is still worth considering: for example, a 40 kWh increase would correspond to about 2,520 EUR under this estimate. One plausible explanation for the weak statistical evidence is that prices for non-premium vehicles may be driven more by standardized model tiers and bundled performance features than by battery capacity alone, or that the within-segment relationship is estimated with greater variability once the other technical controls are included. The lack of significance of `Battery` in the non-premium group may also suggest that battery capacity is partly reflected through other retained performance-related variables, especially `Top_speed`.
 
 ## Diagnostics and Sensitivity Check
 
@@ -374,7 +379,7 @@ Representative prompts used:
 
 ## Diagnostic Plots
 
-The following plots provide supporting evidence for the model-diagnostic statements made in the statistical analysis section.
+Supporting diagnostic plots are provided in Appendix Figure 2 and Appendix Figure 3.
 
 ```{r appendix-diagnostics, fig.cap="Diagnostic plots for the selected regression model"}
 par(mfrow = c(2, 2))
@@ -391,7 +396,7 @@ abline(h = 4 / nrow(ev), col = "red", lty = 2)
 
 ## Pairwise Relationships Among Quantitative Variables
 
-As an additional exploratory check, the following scatterplot matrix summarizes pairwise relationships among the quantitative variables used in the analysis. This is included in the appendix rather than the main body because it is useful for supporting model-building decisions, but it is not the most direct figure for answering the research questions.
+An additional exploratory check of pairwise relationships among the quantitative variables is shown in Appendix Figure 4. This figure is included in the appendix rather than the main body because it is useful for supporting model-building decisions, but it is not the most direct figure for answering the research questions.
 
 ```{r pairs-plot, fig.cap="Scatterplot matrix for quantitative variables used in the analysis"}
 pairs_data <- ev %>%
@@ -422,4 +427,4 @@ pairs(
 )
 ```
 
-This plot is mainly helpful for visually checking which explanatory variables appear strongly associated with price and which predictors appear highly related to one another. In this dataset, it supports the conclusion that variables such as `Battery`, `Range`, `Top_speed`, and `Fast_charge` share substantial overlap, which helps explain why a simpler final model is preferred.
+The scatterplot matrix in Appendix Figure 4 is mainly helpful for visually checking which explanatory variables appear strongly associated with price and which predictors appear highly related to one another. In this dataset, it supports the conclusion that variables such as `Battery`, `Range`, `Top_speed`, and `Fast_charge` share substantial overlap, which helps explain why a simpler final model is preferred.
