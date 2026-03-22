@@ -208,3 +208,11 @@ log_model <- lm(
 
 cat("\nLog-price model\n")
 print(summary(log_model))
+
+
+# improved Diagnostic plots by taking log(y)
+model_log <- lm(log(Price.DE.) ~ Battery * market_segment + Efficiency + Top_speed + Fast_charge, data = ev)
+summary(model_log)
+par(mfrow = c(2, 2))
+plot(model_log)
+par(mfrow = c(1, 1))
