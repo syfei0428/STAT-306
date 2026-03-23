@@ -3,6 +3,7 @@ title: "Research Report"
 output:
   pdf_document:
     latex_engine: xelatex
+fontsize: 10pt
 geometry: margin=1in
 header-includes:
   - \usepackage{float}
@@ -31,7 +32,7 @@ This report studies EV models listed for sale in Germany and investigates whethe
 
 The data come from the *Electric Vehicle Specifications and Prices* dataset obtained from Kaggle and compiled by web scraping EV Database. EV Database aggregates manufacturer-reported technical specifications and listed prices for electric vehicle models listed for sale in Germany. The Kaggle dataset page indicates that the dataset entry was updated "2 years ago," which provides some background on when the posted dataset was last refreshed. However, that platform update note should not be interpreted as a precise statement of the model year coverage or the exact scrape date of the underlying EV listings. The dataset contains 360 observations, where each row represents a distinct EV model. This dataset should not be interpreted as a complete census of all electric vehicles that have ever existed or all EVs ever sold in Germany. Instead, it is best understood as a snapshot of the EV models included in EV Database when the source was scraped and the Kaggle dataset was assembled. The exact calendar year or scrape date is not stated in the raw CSV used here, so the report avoids treating the data as representing a single fully specified year. Since the data are observational rather than experimental, all conclusions in this report are associative rather than causal.
 
-The response variable is `Price.DE.`, the listed vehicle price in euros. The main explanatory variable is `Battery`, measured in kilowatt-hours (kWh). A second key variable is manufacturer segment, coded as premium or non-premium. Following the proposal, Tesla, BMW, Audi, Mercedes-Benz, and Porsche are classified as premium brands based on their widely recognized positioning in the European automotive market. This grouping is intended to reflect broad brand-tier differences rather than a formal regulatory classification. Other quantitative variables that may be useful during model building include `Range`, `Efficiency`, `Top_speed`, `Acceleration..0.100.`, and `Fast_charge`. No major data transformations were applied to the variables. In particular, all quantitative variables were analyzed on their original scales. The only modification was to simplify the analysis by not distinguishing between specific vehicle models, and instead grouping vehicles at the manufacturer level through the premium versus non-premium classification.
+The response variable is `Price.DE.`, the listed vehicle price in euros. The main explanatory variable is `Battery`, measured in kilowatt-hours (kWh). A second key variable is manufacturer segment, coded as premium or non-premium. Following the proposal, Tesla, BMW, Audi, Mercedes-Benz, and Porsche are classified as premium brands based on their widely recognized positioning in the European automotive market. This grouping is intended to reflect broad brand-tier differences rather than a formal regulatory classification. Other quantitative variables that may be useful during model building include `Range`, `Efficiency`, `Top_speed`, `Acceleration..0.100.`, and `Fast_charge`. The exploratory analysis is conducted on the original variable scales. For the main regression analysis, a log transformation of price is later adopted after diagnostics indicate that the untransformed price model does not adequately satisfy the linear-model assumptions. The main structural modification to the raw data is the premium versus non-premium grouping at the manufacturer level.
 
 This report uses multiple linear regression because the response is continuous and the main goal is inference about average relationships. In particular, including an interaction between battery capacity and market segment allows the battery-price relationship to differ between premium and non-premium manufacturers, which directly addresses the second research question. Based on the course material, variables named in the research question remain in the model throughout model selection even if a selection procedure would otherwise remove them.
 
@@ -114,7 +115,7 @@ ev %>%
   arrange(desc(n), Car_name)
 ```
 
-For the main regression, one practical choice is to fit models using complete cases on the variables included in each model. If `Fast_charge` remains in a candidate model, the effective sample size becomes 307 rather than 309 because of the two missing charging values. This should be noted when comparing models. The 51 models with missing prices do not appear dramatically different from the retained models in terms of battery capacity, range, efficiency, top speed, acceleration, or fast-charge capability, which reduces concern that the missing prices are concentrated only among very low-end or very high-end vehicles. However, because the missingness mechanism is not known, some selection bias remains possible.
+For the main regression, one practical choice is to fit models using complete cases on the variables included in each model. If `Fast_charge` remains in a candidate model, the effective sample size becomes 307 rather than 309 because of the two missing charging values. This should be noted when comparing models. To assess whether the 51 models with missing prices appeared systematically different from the retained models, the observed technical variables were compared across the two groups during data preparation. Those comparisons did not suggest large differences in battery capacity, range, efficiency, top speed, acceleration, or fast-charge capability, which reduces concern that the missing prices are concentrated only among very low-end or very high-end vehicles. However, because the missingness mechanism is not known, some selection bias remains possible.
 
 ## Exploratory Summaries
 
@@ -142,13 +143,18 @@ kable(
   caption = "Summary statistics for key quantitative variables"
 )
 ```
-The 309 EV models used in the main analysis have a mean listed price of 67,264 EUR and a median price of 56,942 EUR, suggesting some right-skewness caused by a smaller number of high-priced vehicles (Table 1). Battery capacity is more balanced, with a mean of 71.1 kWh and a median of 70.5 kWh. Clear differences also appear across market segments: premium vehicles are larger and more expensive on average, with a mean price of about 94,359 EUR and a mean battery capacity of 84.0 kWh, compared with 55,418 EUR and 65.4 kWh for non-premium models (Table 1). Overall, the summary statistics indicate that price is more variable than battery capacity and that premium status is associated with both larger batteries and higher prices. These patterns motivate examining the joint relationship between price, battery capacity, and market segment in the regression analysis.
+The 309 EV models used in the main analysis have a mean listed price of 67,264 EUR and a median price of 56,942 EUR, suggesting some right-skewness caused by a smaller number of high-priced vehicles (Table 1). Battery capacity is more balanced, with a mean of 71.1 kWh and a median of 70.5 kWh. Overall, the summary statistics indicate that price is more variable than battery capacity. Additional grouped summaries, not shown in Table 1, indicate that premium vehicles tend to have both larger batteries and higher listed prices on average than non-premium vehicles. These patterns motivate examining the joint relationship between price, battery capacity, and market segment in the regression analysis.
 
 ```{r price-boxplot, fig.cap="Boxplot of EV prices (EUR)", fig.pos="H", fig.width=4.5, fig.height=3.5}
 ggplot(ev, aes(y = Price.DE.)) +
   geom_boxplot(fill = "lightblue") +
   labs(
     y = "Price (EUR)"
+  ) +
+  theme(
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
   )
 ```
 
@@ -218,15 +224,17 @@ correlation_table <- round(cor(quant_vars, use = "complete.obs"), 2)
 kable(correlation_table, caption = "Correlation matrix for quantitative variables")
 ```
 
+\newpage
+
 Potential multicollinearity can be assessed from the correlation matrix of the main quantitative vehicle characteristics (Table 3). Several strong pairwise relationships are evident. Price is strongly positively correlated with Battery (0.70) and Top_speed (0.76), indicating that more expensive vehicles tend to have larger batteries and higher performance. At the same time, Battery and Range are themselves highly correlated (0.88), suggesting that these variables capture similar underlying information about vehicle capability. In addition, Top_speed and Acceleration_0_100 are strongly negatively correlated (-0.84), reflecting the fact that faster vehicles tend to have lower acceleration times. Overall, these correlations reveal substantial dependence among the technical variables. This suggests that including many of these predictors simultaneously may introduce multicollinearity, which can make regression coefficients unstable and harder to interpret. The broader pairwise relationships among the quantitative variables are shown in Appendix Figure 5.
 
 # Statistical Analysis
 
 ## Modeling Strategy
 
-The study employs a multiple linear regression framework, as the response variable—vehicle price in Euros ($Price.DE.$)—is a continuous measure. To align the statistical architecture with the core research objectives, the model is structured around a foundational set of required predictors: battery capacity ($Battery$), market classification ($market\_segment$), and their corresponding interaction term. These variables are held constant throughout the refinement process to ensure that the primary research questions regarding segment-based price scaling are directly addressed. To account for potential confounding factors and technical drivers of valuation, a suite of auxiliary control variables, including $Range$, $Efficiency$, $Top\_speed$, $Acceleration\_0\_100$, and $Fast\_charge$, were initially incorporated into the full model specification.
+The study employs a multiple linear regression framework because the response variable is continuous and the goal is inference about average relationships. The model is built around the research-question terms: battery capacity ($Battery$), market segment ($market\_segment$), and their interaction. These terms are retained throughout model selection so that both research questions remain directly addressable. Additional technical variables, including $Range$, $Efficiency$, $Top\_speed$, $Acceleration\_0\_100$, and $Fast\_charge$, are treated as optional controls.
 
-The choice of a backward elimination strategy using partial F-tests, specifically through the drop1 procedure, was motivated by its superior ability to preserve the structural integrity of the model during the simplification phase. Unlike forward selection, which enters variables one by one and may fail to identify predictors that only become significant in the presence of others, backward elimination begins with the "full global landscape" of the data. This "top-down" methodology allows the model to account for the simultaneous influence of all candidate predictors, thereby capturing complex interdependencies and potential suppressor effects that simpler stepwise methods might overlook. By systematically pruning the least significant optional controls while shielding the required research terms from removal, this approach strikes an optimal balance between statistical parsimony and theoretical relevance. It ensures that the final model is not merely a collection of the most "statistically noisy" variables, but a refined instrument that retains only the essential technical controls necessary to isolate the true effect of battery capacity on price across different market segments.
+Backward elimination based on partial F-tests is used for the optional controls only. This test-based approach is appropriate here because the project focuses on inference rather than prediction. Starting from the full model allows each optional variable to be assessed while the others are present, and it helps reduce the model to a more interpretable form without removing the terms required by the research questions.
 
 ```{r backward-selection-function, include=FALSE}
 backward_keep_required <- function(data, response, required_terms, optional_terms, alpha = 0.05) {
@@ -300,9 +308,7 @@ Because these violations could lead to unstable coefficient estimates and unreli
 
 ## Model Refinement: Log-Transformation
 
-To address the heteroscedasticity, we applied a natural log transformation ($log(Price)$). We then re-ran our custom backward elimination procedure on the log-transformed response.
-
-The following table presents the results of our final, statistically robust model
+To address the heteroscedasticity, we applied a natural log transformation ($log(Price)$). The backward-elimination procedure was then repeated using the log-transformed response.
 
 ```{r run-backward-selection, include=FALSE}
 required_terms <- c("Battery", "market_segment", "Battery:market_segment")
@@ -326,9 +332,9 @@ summary(final_model)
 
 ## Main Model Results (log linear)
 
-The final model was fitted on 307 observations, as 2 additional rows were excluded due to missing values in the Fast_charge variable. The final regression results for the log-transformed price model are presented in Table 4. After the backward elimination procedure, Acceleration_0_100 was the only variable removed, while Range, Efficiency, Top_speed, and Fast_charge were retained as statistically significant controls. The model explains 84.12% of the variance in log-price (Adjusted $R^2 = 0.8412$).
+The final model was fitted on 307 observations, as 2 additional rows were excluded due to missing values in `Fast_charge`. Final coefficient estimates are reported in Table 4. After backward elimination, `Acceleration_0_100` was removed, while `Range`, `Efficiency`, `Top_speed`, and `Fast_charge` were retained as control variables. The adjusted $R^2$ for the final log-price model is 0.8412.
 
-The lack of statistical significance for the standalone Battery term in the non-premium segment ($p = 0.1517$) is likely due to its high correlation with Range ($r = 0.88$). In the log-linear model, the unique explanatory power of battery capacity is partially absorbed by the range and performance metrics, though its interaction with market segment remains a critical and significant driver of price.
+In this adjusted model, the coefficient for `Battery` in the baseline non-premium segment is not statistically significant ($p = 0.1517$). This is plausible given the strong overlap between `Battery` and other retained technical variables, especially `Range` ($r = 0.88$). In practical terms, once `Range` is already in the model, the battery coefficient asks whether two vehicles with the same range but different battery capacities still differ in price, which is a much narrower question than the simple battery-price relationship. As a result, the model should be interpreted as assessing the association of battery capacity with price after holding constant several related measures of vehicle performance.
 
 ```{r coefficient-table}
 kable(round(summary(final_model)$coefficients, 4),
@@ -337,39 +343,38 @@ kable(round(summary(final_model)$coefficients, 4),
 
 ### Interpretation of Results
 
-#### The Role of the Luxury Interaction Effect
+#### Interaction Between Battery Capacity and Segment
 
-The most critical finding of the study is the highly significant interaction term, $Battery:market\_segmentPremium$ ($\beta = 0.0051, p < 0.001$). This coefficient provides compelling evidence that the marginal valuation of battery capacity is not uniform across the industry but is instead contingent upon brand positioning. In the log-linear context, this positive interaction indicates that for every additional kilowatt-hour ($kWh$) of battery capacity, premium brands command a significantly higher percentage increase in price compared to non-premium brands. This suggests a "luxury multiplier" effect: in the premium segment, hardware scaling is not merely a functional upgrade but is marketed and priced as a high-value performance differentiator, allowing these manufacturers to capture greater consumer surplus from battery advancements.
+The most important result is the highly significant interaction term, $Battery:market\_segmentPremium$ ($\beta = 0.0051, p < 0.001$). This coefficient represents the difference in the battery-price slope between premium and non-premium vehicles in the adjusted log-linear model. Its positive sign indicates that, after controlling for the other technical variables in the model, the association between battery capacity and price is more positive in the premium segment than in the non-premium segment. Even though the adjusted segment-specific slopes are small after conditioning on highly correlated performance variables, the interaction provides strong statistical evidence that the battery-price relationship is not the same across the two segments.
 
-#### Segment-Specific Dynamics: Premium vs. Non-Premium
+#### Segment-Specific Interpretation
 
-For the baseline non-premium segment, the model reveals a small and statistically non-significant negative coefficient for battery capacity ($\beta = -0.0047, p = 0.1517$). While a negative slope may seem counterintuitive, it signifies that once range, efficiency, and top speed are held constant, the physical size of the battery does not independently drive price for mass-market vehicles. In this segment, consumers likely view the battery as a means to an end ($Range$); if a vehicle can achieve a high range with a smaller, more efficient battery, the physical $kWh$ count offers no additional status or price premium.
+For the baseline non-premium segment, the coefficient for battery capacity is small, negative, and not statistically significant ($\beta = -0.0047, p = 0.1517$). This suggests that once range, efficiency, top speed, and charging performance are held fixed, battery capacity by itself does not show a clear independent association with listed price among non-premium vehicles.
 
-Conversely, for the premium segment, the effective slope is the sum of the baseline and the interaction term ($ -0.0047 + 0.0051 = 0.0004$). While the net effect is near zero when all other performance metrics are fixed, the stark contrast between the two segments confirms that premium manufacturers successfully decouple battery capacity from simple utility, treating it as part of a high-performance "bundle" that scales more aggressively with price.
+For the premium segment, the battery slope is the sum of the baseline term and the interaction term, giving an estimated slope of $-0.0047 + 0.0051 = 0.0004$. This adjusted premium slope is therefore close to zero, but it remains higher than the corresponding non-premium slope because of the positive interaction. The key takeaway is therefore not that the adjusted battery effect is large within either segment on its own, but that the model still detects a statistically meaningful difference between segments once the other technical variables are held fixed. Taken together with the stronger unadjusted slopes shown earlier in Table 2, the fitted model suggests that much of the raw battery-price association is shared with other performance variables, while the remaining adjusted battery relationship still differs by market segment.
 
-#### The "Performance Bundle" and Control Variables
-The model results for the auxiliary variables—$Range$ ($p = 0.0044$), $Top\_speed$ ($p < 2 \times 10^{-16}$), and $Efficiency$ ($p < 0.001$)—further validate the hypothesis that the German EV market prices vehicles as integrated "performance bundles." The strong positive significance of $Top\_speed$ and $Range$ confirms that traditional automotive value drivers (velocity and endurance) remain the dominant factors in EV valuation. The significance of $Efficiency$ is particularly noteworthy; it suggests that the market rewards engineering refinement. Vehicles that can extract more utility from their energy storage are priced higher, indicating that savvy EV consumers (or the manufacturers' pricing strategies) value technical sophistication over raw battery volume.
+#### Control Variables
+The retained control variables also help explain the pricing patterns. `Range` ($p = 0.0044$), `Top_speed` ($p < 2 \times 10^{-16}$), and `Efficiency` ($p < 0.001$) each contribute information beyond battery capacity alone, indicating that the market values a broader set of performance characteristics. Their inclusion also helps explain why the adjusted coefficient for battery capacity is much smaller than the simple within-segment slopes reported in Table 2.
 
 ## Diagnostics and Model Selection
 
-Initial diagnostics of the untransformed price model revealed significant violations of linear regression assumptions. As shown in Appendix Figure 3, the residual-versus-fitted plot exhibited a prominent fan-shaped pattern, indicating heteroscedasticity where error variance increases with the fitted values. Furthermore, the normal Q-Q plot indicated a heavy right tail, suggesting residuals were not normally distributed.
+Initial diagnostics of the untransformed price model revealed meaningful departures from the linear-model assumptions. As shown in Appendix Figure 3, the residual-versus-fitted plot displayed increasing spread as fitted values increased, and the Q-Q plot showed a heavy upper tail. These patterns are consistent with heteroscedasticity and right-skewness in price.
 
-To address these issues, we adopted a log-linear model ($log(Price)$). This transformation successfully stabilized the error variance and normalized the residuals, providing a much more robust foundation for inference. The log-model also improved the fit significantly, increasing the Adjusted $R^2$ from 0.7313 to 0.8412. Consequently, the log-linear model is retained as our primary model for interpreting the battery-price relationship across different manufacturer segments.
+The log transformation of price reduced these problems and improved model fit, with adjusted $R^2$ increasing from 0.7313 to 0.8412. Some mild upper-tail deviation remains in the Q-Q plot after transformation, but it is not severe enough to overturn the main inferential conclusions. For that reason, the log-linear model is used as the primary inferential model in the report.
 
 
 # Discussion and Conclusion
 
-## Discussion and Synthesis of Findings
-The empirical evidence provided by this study confirms that the relationship between battery capacity and electric vehicle pricing is fundamentally moderated by market positioning. While a cursory glance at the raw data might suggest a linear scaling of costs, the refined log-linear analysis uncovers a more complex "luxury multiplier" effect that defines the premium segment. In this context, battery capacity does not merely function as a cost-of-goods component; rather, it serves as a primary lever for value appropriation. For premium manufacturers, each additional kilowatt-hour of energy storage is leveraged to command a disproportionately higher price premium, suggesting that in the upper tiers of the German market, technical hardware is inextricably linked to brand prestige and consumer status.
+## Discussion
+Taken together, the exploratory and regression results suggest that battery capacity is associated with EV price, but that relationship depends on how price is modeled and which other technical variables are held fixed. In the simple within-segment regressions, battery capacity has a clear positive association with price in both market segments, and the slope is steeper for premium vehicles. In the adjusted log-linear model, however, much of that simple association is absorbed by other correlated performance measures such as range and top speed. Under that adjusted specification, the battery coefficient is not statistically significant for non-premium vehicles, while the positive interaction term indicates that the battery-price relationship remains more favorable in the premium segment than in the non-premium segment.
 
-## Theoretical Interpretations and Industry Implications
-The transition from a standard linear model to a log-linear specification was not merely a statistical adjustment for heteroscedasticity, but a theoretical necessity to capture the multiplicative nature of automotive valuation. This shift highlights that as vehicles move up the performance ladder, price increases are compounding rather than additive. In the premium market, the "price of power" is amplified because battery size is bundled with high-performance motors, advanced thermal management, and elite brand signaling. This implies that premium brands have successfully decoupled their pricing strategies from the underlying commodity costs of lithium-ion cells, instead charging a premium for the "performance envelope" that a larger battery enables. For non-premium brands, however, the lack of a significant independent battery effect suggests a high level of price sensitivity, where consumers view battery size strictly through the lens of functional utility and range.
+This pattern is consistent with the idea that EV prices reflect a bundle of related technical characteristics rather than battery capacity alone. For non-premium vehicles in particular, battery size may matter mainly through the performance outcomes it helps produce, such as longer range or higher speed, rather than as an independently priced feature. For premium vehicles, the positive interaction suggests that battery capacity is more closely aligned with pricing even after controlling for those related characteristics, although the adjusted premium slope itself is small in the final model.
 
-## Limitations and Avenues for Future Research
-While the current model explains a substantial 84% of price variance, it is important to acknowledge the limitations inherent in a cross-sectional snapshot of the German EV market. The remaining unexplained variance likely resides in qualitative dimensions that are difficult to quantify, such as cabin material quality, the sophistication of proprietary software ecosystems, and autonomous driving capabilities. Furthermore, the data reflects a specific moment in the technological lifecycle of electric mobility. As global battery production scales and chemistries evolve toward solid-state or cobalt-free alternatives, the "luxury premium" identified here may face downward pressure. Future longitudinal research would be invaluable in tracking whether this brand-based price wedge narrows as battery technology becomes increasingly commodified and accessible across all market segments.
+## Limitations
+Several limitations should be kept in mind. First, the dataset is an observational snapshot of EV models listed in EV Database and does not represent all EVs sold in Germany or all EVs from a clearly specified year. Second, the premium versus non-premium classification is a simplified grouping based on widely recognized market positioning rather than a formal industry standard. Third, some relevant determinants of price, such as interior quality, software features, or driver-assistance packages, are not recorded in the dataset. Finally, because 51 observations had missing prices and were excluded, some risk of selection bias remains even though the missing-price models do not appear dramatically different on the observed technical variables.
 
-## Concluding Remarks
-In conclusion, while battery capacity remains a foundational determinant of electric vehicle pricing, its economic impact is significantly magnified by the strategic tiering of the market. The findings demonstrate that the valuation of energy storage is not a fixed engineering constant but is heavily dictated by brand-specific performance expectations and market positioning. As the industry moves toward mass-adoption, understanding this interplay between hardware scaling and brand equity will be essential for both policymakers and manufacturers navigating the transition to a fully electrified automotive landscape.
+## Conclusion
+The analysis provides evidence that the association between battery capacity and EV price differs by market segment. Premium vehicles exhibit a steeper unadjusted battery-price relationship, and the adjusted log-linear model also indicates a significant difference between premium and non-premium segments through the interaction term. At the same time, the final model shows that battery capacity alone does not have a clear independent association with price for non-premium vehicles once other related technical variables are held constant. Overall, the results suggest that EV pricing reflects both battery capacity and broader performance characteristics, and that these relationships are not the same across manufacturer segments.
 
 # Statement of AI Use
 
@@ -386,7 +391,7 @@ Representative prompts used:
 
 ## Diagnostic Plots
 
-Supporting diagnostic plots are provided in Appendix Figure 3 and Appendix Figure 4.
+Supporting diagnostic plots are provided in Appendix Figure 3 and Appendix Figure 4. In Appendix Figure 4, the dashed red reference line marks the common heuristic threshold of $4/n$ for Cook's distance.
 
 ```{r appendix-diagnostics, fig.cap="Diagnostic plots for the selected regression model"}
 par(mfrow = c(2, 2))
