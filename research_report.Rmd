@@ -1,5 +1,6 @@
 ---
 title: "Research Report"
+author: "Qianxue Wang, Shumin Wang, Phoebe Yu, Yifei Shi"
 output:
   pdf_document:
     latex_engine: xelatex
@@ -8,7 +9,7 @@ geometry: margin=1in
 header-includes:
   - \usepackage{float}
   - \usepackage{placeins}
-date: "2026-03-16"
+date: "2026-03-23"
 ---
 
 ```{r setup, include=FALSE}
