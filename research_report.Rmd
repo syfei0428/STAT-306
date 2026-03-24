@@ -225,6 +225,8 @@ correlation_table <- round(cor(quant_vars, use = "complete.obs"), 2)
 kable(correlation_table, caption = "Correlation matrix for quantitative variables")
 ```
 
+\newpage
+
 Potential multicollinearity can be assessed from the correlation matrix of the main quantitative vehicle characteristics (Table 3). Several strong pairwise relationships are evident. Price is strongly positively correlated with Battery (0.70) and Top_speed (0.76), indicating that more expensive vehicles tend to have larger batteries and higher performance. At the same time, Battery and Range are themselves highly correlated (0.88), suggesting that these variables capture similar underlying information about vehicle capability. In addition, Top_speed and Acceleration_0_100 are strongly negatively correlated (-0.84), reflecting the fact that faster vehicles tend to have lower acceleration times. Overall, these correlations reveal substantial dependence among the technical variables. This suggests that including many of these predictors simultaneously may introduce multicollinearity, which can make regression coefficients unstable and harder to interpret. The broader pairwise relationships among the quantitative variables are shown in Appendix Figure 5.
 
 # Statistical Analysis
