@@ -62,6 +62,43 @@ missing_price_comparison <- ev_missing_check %>%
   )
 print(missing_price_comparison)
 
+# --- Missing Value Deep Dive ---
+
+# 1. Extract all rows with missing Price.DE.
+ev_missing_price <- ev_raw %>%
+  mutate(
+    manufacturer = sub(" .*", "", Car_name),
+    manufacturer = ifelse(manufacturer == "Mercedes-Benz", "Mercedes-Benz", manufacturer),
+    market_segment = ifelse(manufacturer %in% premium_brands, "Premium", "Non-premium")
+  ) %>%
+  filter(is.na(Price.DE.)) %>%
+  select(Car_name, manufacturer, market_segment, Battery, Range, Top_speed, Fast_charge)
+
+cat("--- Observations with Missing Price (n =", nrow(ev_missing_price), ") ---\n")
+print(as.data.frame(ev_missing_price))
+
+# 2. Summary by manufacturer
+cat("\n--- Missing Price Count by Manufacturer ---\n")
+ev_missing_price %>%
+  count(manufacturer, sort = TRUE) %>%
+  as.data.frame() %>%
+  print()
+
+# 3. Summary by market segment
+cat("\n--- Missing Price Count by Market Segment ---\n")
+ev_missing_price %>%
+  count(market_segment) %>%
+  print()
+
+# 4. Extract rows with missing Fast_charge
+cat("\n--- Observations with Missing Fast_charge (n =",
+    sum(is.na(ev_raw$Fast_charge)), ") ---\n")
+ev_raw %>%
+  filter(is.na(Fast_charge)) %>%
+  select(Car_name, Price.DE., Battery, Range) %>%
+  print()
+
+
 # --- 3. Exploratory Data Visualization ---
 
 # Plot 1: Original Scale (Helps identify non-linearity and heteroscedasticity)
