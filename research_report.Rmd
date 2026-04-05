@@ -1,15 +1,17 @@
 ---
 title: "Research Report"
 author: "Qianxue Wang, Shumin Wang, Phoebe Yu, Yifei Shi"
+date: "2026-03-23"
 output:
+  html_document:
+    df_print: paged
   pdf_document:
     latex_engine: xelatex
-fontsize: 10pt
 geometry: margin=1in
 header-includes:
-  - \usepackage{float}
-  - \usepackage{placeins}
-date: "2026-03-23"
+- \usepackage{float}
+- \usepackage{placeins}
+fontsize: 10pt
 ---
 
 ```{r setup, include=FALSE}
@@ -29,6 +31,9 @@ knitr::opts_chunk$set(
 3. Exploratory Analysis中Data preparation第一段加了点内容，说明我们missing value的原因，由于没找到源数据对于缺失值的任何解释，所以我在r文件里也加了一些对缺失值的分析，根据品牌，是否是premium，以及把fast_charge缺失的两辆车都单独列了出来，根据数据进行了分析缺失原因，如果你们有空可以再去找找原来数据作者对缺失值有什么解释，我没找到目前
 4. 加了一段解释，说明为什么删除Fast_charge的那两个缺失值不会影响我们的分析，因为他们都在均值左右，不是极端值
 5. 对于品牌名字提取，TA建议我们手动把检查名字的分类有没有出错，我在提到的部分后面加了一句，说明我们已经手动检查过了
+
+6. 根据老师的建议，将figure 1的boxplot改为histogram，更方便呈现EV价格的分布
+7. 根据Kenny建议(plots for distribution of other variables)，加入Appendix 6，可视化Battery Capacity and Driving Range的分布
 
 
 # Introduction
@@ -155,20 +160,33 @@ kable(
 ```
 The 309 EV models used in the main analysis have a mean listed price of 67,264 EUR and a median price of 56,942 EUR, suggesting some right-skewness caused by a smaller number of high-priced vehicles (Table 1). Battery capacity is more balanced, with a mean of 71.1 kWh and a median of 70.5 kWh. Overall, the summary statistics indicate that price is more variable than battery capacity. Additional grouped summaries, not shown in Table 1, indicate that premium vehicles tend to have both larger batteries and higher listed prices on average than non-premium vehicles. These patterns motivate examining the joint relationship between price, battery capacity, and market segment in the regression analysis.
 
-```{r price-boxplot, fig.cap="Boxplot of EV prices (EUR)", fig.pos="H", fig.width=4.5, fig.height=3.5}
-ggplot(ev, aes(y = Price.DE.)) +
-  geom_boxplot(fill = "lightblue") +
+```{r}
+ggplot(ev, aes(x = Price.DE., fill = market_segment)) +
+  geom_histogram(binwidth = 5000, color = "black", alpha = 0.7) +
+  theme_bw() +
+  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
+  facet_wrap(~market_segment, ncol = 1) +
   labs(
-    y = "Price (EUR)"
+    title = "Distribution of EV Prices by Market Segment",
+    subtitle = "Histogram showing price frequency (Bin width = 5000 EUR)",
+    x = "Price (Euro)",
+    y = "Count / Frequency",
+    fill = "Market Segment"
   ) +
   theme(
-    axis.title.x = element_blank(),
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank()
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    strip.background = element_rect(fill = "gray90"), 
+    strip.text = element_text(face = "bold")
   )
 ```
 
-The boxplot of price further highlights its distributional features (Figure 1). In particular, the presence of a long upper tail and several high-price outliers confirms that price is right-skewed. Consistent with this visual evidence, the summary statistics suggest two important features that matter for modeling: price is more variable and somewhat right-skewed, while premium vehicles tend to have both larger batteries and higher prices. This motivates focusing on the joint relationship between price, battery capacity, and market segment.
+The histogram of vehicle prices provides a detailed visualization of the underlying distribution across different market segments (Figure 1). While the summary statistics in Table 1 point to higher average costs for premium vehicles, the histogram reveals a pronounced right-skew (positive skew) in both categories. This 'long-tail' structure indicates that most EVs are concentrated in the affordable-to-midrange brackets, with a sparse but significant number of high-priced luxury models extending the scale.
+
+By comparing the two segments, we observe that the Non-premium distribution is tightly peaked, whereas the Premium segment shows a much broader dispersion and a higher frequency of observations in the upper price percentiles. This visual evidence of non-normality and heteroscedasticity strongly motivates the use of a logarithmic transformation for the price variable in our subsequent regression models. 
+
+In addition to price, the distributions of key technical indicators—Battery Capacity (kWh) and Driving Range (km)—were examined to understand the physical differences between market segments. While the summary statistics (Table 1) provide a numerical overview, the visual distributions (see Appendix Figure 6) show that premium vehicles not only possess higher means for these variables but also exhibit a significantly broader variance, supporting the need for a segment-stratified analysis.
 
 The main exploratory visualization plots price against battery capacity with separate fitted lines for premium and non-premium manufacturers (Figure 2). This figure directly addresses both research questions by showing both the overall battery-price association and the extent to which that association may differ by market segment.
 
@@ -451,5 +469,33 @@ pairs(
 
 The scatterplot matrix in Appendix Figure 5 is mainly helpful for visually checking which explanatory variables appear strongly associated with price and which predictors appear highly related to one another. In this dataset, it supports the conclusion that variables such as `Battery`, `Range`, `Top_speed`, and `Fast_charge` share substantial overlap, which helps explain why a simpler final model is preferred.
 
+## Battery and Range Distributions
+```{r}
+# --- Appendix Figure 6: Battery and Range Distributions ---
+library(patchwork)
+
+# Battery Plot
+p_bat_app <- ggplot(ev, aes(x = Battery, fill = market_segment)) +
+  geom_histogram(binwidth = 10, color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
+  theme_bw() +
+  facet_wrap(~market_segment, ncol = 1) +
+  labs(title = "(a) Battery Capacity (kWh)", x = "Battery (kWh)", y = "Count") +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+# Range Plot
+p_rng_app <- ggplot(ev, aes(x = Range, fill = market_segment)) +
+  geom_histogram(binwidth = 50, color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
+  theme_bw() +
+  facet_wrap(~market_segment, ncol = 1) +
+  labs(title = "(b) Driving Range (km)", x = "Range (km)", y = "Count") +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+
+p_bat_app + p_rng_app + 
+  plot_annotation(title = "Appendix Figure 6: Histograms of Battery Capacity and Range by Segment",
+                  theme = theme(plot.title = element_text(face = "bold", hjust = 0.5)))
+```
 
 **Code and data submission:** Qianxue Wang
