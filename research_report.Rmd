@@ -3,10 +3,10 @@ title: "Research Report"
 author: "Qianxue Wang, Shumin Wang, Phoebe Yu, Yifei Shi"
 date: "2026-03-23"
 output:
-  html_document:
-    df_print: paged
   pdf_document:
     latex_engine: xelatex
+  html_document:
+    df_print: paged
 geometry: margin=1in
 header-includes:
 - \usepackage{float}
