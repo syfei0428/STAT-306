@@ -106,9 +106,6 @@ ev_raw %>%
   select(Car_name, Price.DE., Battery, Range) %>%
   print()
 
-
-# --- 3. Exploratory Data Visualization ---
-
 # --- 3. Duplicate-name check mentioned in the report ---
 
 duplicate_names <- ev %>%
