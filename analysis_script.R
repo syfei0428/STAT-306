@@ -154,15 +154,27 @@ cat("\n")
 
 # --- 5. Exploratory plots used in the report ---
 
-price_boxplot <- ggplot(ev, aes(y = Price.DE.)) +
-  geom_boxplot(fill = "lightblue") +
-  labs(y = "Price (EUR)") +
+price_histogram <- ggplot(ev, aes(x = Price.DE., fill = market_segment)) +
+  geom_histogram(binwidth = 5000, color = "black", alpha = 0.7) +
+  theme_bw() +
+  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
+  facet_wrap(~market_segment, ncol = 1) +
+  labs(
+    title = "Distribution of EV Prices by Market Segment",
+    subtitle = "Histogram showing price frequency (Bin width = 5000 EUR)",
+    x = "Price (Euro)",
+    y = "Count / Frequency",
+    fill = "Market Segment"
+  ) +
   theme(
-    axis.title.x = element_blank(),
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank()
+    legend.position = "none",
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    strip.background = element_rect(fill = "gray90"), 
+    strip.text = element_text(face = "bold")
   )
-print(price_boxplot)
+print(price_histogram)
+
 
 scatter_plot <- ggplot(ev, aes(x = Battery, y = Price.DE., color = market_segment)) +
   geom_point(alpha = 0.7) +
@@ -374,3 +386,30 @@ pairs(
   pch = 19,
   cex = 0.5
 )
+
+# --- 13. Histogram of Battery and Range Distributions in Appendix ---
+
+library(patchwork)
+
+# Battery Plot
+p_bat_app <- ggplot(ev, aes(x = Battery, fill = market_segment)) +
+  geom_histogram(binwidth = 10, color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
+  theme_bw() +
+  facet_wrap(~market_segment, ncol = 1) +
+  labs(title = "(a) Battery Capacity (kWh)", x = "Battery (kWh)", y = "Count") +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+# Range Plot
+p_rng_app <- ggplot(ev, aes(x = Range, fill = market_segment)) +
+  geom_histogram(binwidth = 50, color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
+  theme_bw() +
+  facet_wrap(~market_segment, ncol = 1) +
+  labs(title = "(b) Driving Range (km)", x = "Range (km)", y = "Count") +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+
+p_bat_app + p_rng_app + 
+  plot_annotation(title = "Appendix Figure 6: Histograms of Battery Capacity and Range by Segment",
+                  theme = theme(plot.title = element_text(face = "bold", hjust = 0.5)))
