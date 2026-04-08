@@ -24,25 +24,25 @@ knitr::opts_chunk$set(
 )
 ```
 
-# 第二稿改动（提交前删除）
+# Summary of Revisions Since Draft 1
 
-1. Introduction中倒数第二段，加上了对每个variable的简单解释，并把指代从原来的用variable names指代，改成用variable的意思指代
-2. Introduction的最后一段，原本提到了"Based on course material"，将其删除，而是用更通用的学术用语替代，让这个报告更像学术写作而不是课堂作业
-3. Exploratory Analysis中Data preparation第一段加了点内容，说明我们missing value的原因，由于没找到源数据对于缺失值的任何解释，所以我在r文件里也加了一些对缺失值的分析，根据品牌，是否是premium，以及把fast_charge缺失的两辆车都单独列了出来，根据数据进行了分析缺失原因，如果你们有空可以再去找找原来数据作者对缺失值有什么解释，我没找到目前
-4. 加了一段解释，说明为什么删除Fast_charge的那两个缺失值不会影响我们的分析，因为他们都在均值左右，不是极端值
-5. 对于品牌名字提取，TA建议我们手动把检查名字的分类有没有出错，我在提到的部分后面加了一句，说明我们已经手动检查过了
+This page summarizes the main revisions made in response to feedback on the first draft. It is included separately from the main report.
 
-6. 根据老师的建议，将figure 1的boxplot改为histogram，更方便呈现EV价格的分布
-7. 根据Kenny建议(plots for distribution of other variables)，加入Appendix 6，可视化Battery Capacity and Driving Range的分布
+- Revised the introduction to describe variables in substantive terms rather than primarily by code-style variable names.
+- Clarified the data source, snapshot nature of the dataset, and observational scope of the study.
+- Expanded the data-preparation section to explain missing values, including why rows with missing prices were excluded and why the two observations missing fast-charging speed are unlikely to affect the fitted models materially.
+- Added a note that extracted manufacturer names were manually checked after cleaning.
+- Replaced the original price boxplot with a histogram to better display the distribution of vehicle prices.
+- Added appendix figures showing broader pairwise relationships and the distributions of battery capacity and driving range by segment.
+- Revised the modeling-strategy section to use more formal wording, clarified that the initial raw-price model contains all covariates, and explained the backward partial-F-test procedure more clearly.
+- Strengthened the justification for the log transformation by linking it to the right-skewness and heteroscedasticity observed in the exploratory analysis and diagnostics.
+- Expanded the interpretation of the battery and range coefficients to explain why battery capacity is not statistically significant in the adjusted non-premium model and what that coefficient represents after controlling for related variables.
+- Revised the interaction interpretation to focus more clearly on the difference between premium and non-premium pricing patterns.
+- Added clearer references to appendix diagnostics and explained the Cook's distance reference line.
+- Tightened the discussion and conclusion so they align more directly with the final fitted model.
 
-8. 根据老师建议Modeling Strategy第一段将optional controls改成additional candidate variables considered during model selection
-9. 根据老师建议modeling strategy第二段在partial f-test后加了解释(implemented using drop1() in R)， 加一句Variables with p-values greater than 0.05 are removed sequentially.
-10. 根据老师建议在initial model第一段raw model后加上解释(i.e., the model containing all covariates)
-11. log-tranformation部分加上原因 the right-skewness observed in the exploratory analysis
-12. Main model result第二段解释保留Range and Battery的原因是leaving the coefficient for Battery to reflect only the remaining variation。加了解释为什么 Battery 不显著 + 它在模型中真正代表什么
-13. 根据老师建议将Interaction和Segment合并成一段，直接说premium 更看重 battery，non-premium 不太看。删掉slope推导过程。
-14. Diagnostics部分提到multicollinearity因为battery和range高度相关，mention appappendix figure 3
-15. Discussion部分删掉simple model部分，将favorable改成remains stronger。
+\newpage
+\setcounter{page}{1}
 
 # Introduction
 
@@ -119,7 +119,7 @@ summary(ev)
 nrow(ev)
 ```
 
-After removing rows with missing price, the main analysis dataset contains 309 EV models. A check of duplicate `Car_name` values shows that some names appear more than once. These rows were retained because they are not exact duplicates of the full record. In several cases, the repeated names correspond to different EV Database links and slightly different technical specifications, which suggests updated entries or distinct configurations rather than accidental duplication. For example, duplicated Mercedes entries often appear as an older version with missing price and a newer version with a reported price, while the duplicated Mini Cooper SE entries differ substantially in battery capacity and range and therefore represent genuinely different configurations.
+After removing rows with missing price, the main analysis dataset contains 309 EV models. A check of duplicate `Car_name` values shows that some names appear more than once. These rows were retained because they are not exact duplicates of the full record. In several cases, the repeated names correspond to different EV Database links and slightly different technical specifications, which suggests updated entries or distinct configurations rather than accidental duplication. For example, duplicated Mercedes entries often appear as an older version with missing price and a newer version with a reported price, while the duplicated Mini Cooper SE entries differ substantially in battery capacity and range and therefore represent genuinely different configurations. Because these repeated names appear to represent distinct listings rather than repeated measurements of the same vehicle record, retaining them does not appear to create a direct violation of the working independence assumption used in the regression analysis.
 
 ```{r data-checks, include=FALSE}
 ev_raw %>%
@@ -270,7 +270,7 @@ Potential multicollinearity can be assessed from the correlation matrix of the m
 
 The study employs a multiple linear regression framework because the response variable is continuous and the goal is inference about average relationships. The model is built around the research-question terms: battery capacity ($Battery$), market segment ($market\_segment$), and their interaction. These terms are retained throughout model selection so that both research questions remain directly addressable. Additional technical variables, including $Range$, $Efficiency$, $Top\_speed$, $Acceleration\_0\_100$, and $Fast\_charge$, are treated as additional candidate variables considered during model selection.
 
-Backward elimination based on partial F-tests (implemented using drop1() in R) is used for the optional controls only. Variables with p-values greater than 0.05 are removed sequentially. This test-based approach is appropriate here because the project focuses on inference rather than prediction. Starting from the full model allows each candidate variable to be assessed while the others are present, and it helps reduce the model to a more interpretable form without removing the terms required by the research questions.
+Backward elimination based on partial F-tests (implemented using drop1() in R) is used for the additional candidate variables only. Variables with p-values greater than 0.05 are removed sequentially. This test-based approach is appropriate here because the project focuses on inference rather than prediction. Other criteria such as information criteria could also be considered, but a test-based approach is used here because the emphasis is on retaining variables that contribute inferentially once the research-question terms are fixed. Starting from the full model allows each candidate variable to be assessed while the others are present, and it helps reduce the model to a more interpretable form without removing the terms required by the research questions.
 
 ```{r backward-selection-function, include=FALSE}
 backward_keep_required <- function(data, response, required_terms, optional_terms, alpha = 0.05) {
@@ -366,6 +366,12 @@ summary(final_model)
 ```
 
 
+## Diagnostics and Model Selection
+
+Initial diagnostics of the untransformed price model revealed meaningful departures from the linear-model assumptions. As shown in Appendix Figure 3, the residual-versus-fitted plot displayed increasing spread as fitted values increased, and the Q-Q plot showed a heavy upper tail, indicating heteroscedasticity and right-skewness in price. In addition, several technical variables (e.g., Battery and Range) were found to be highly correlated, raising concerns about multicollinearity and motivating careful variable selection.
+
+The log transformation of price reduced these problems and improved model fit, with adjusted $R^2$ increasing from 0.7313 to 0.8412. Some mild upper-tail deviation remains in the Q-Q plot after transformation, but it is not severe enough to overturn the main inferential conclusions. These diagnostic plots are provided in Appendix Figure 3 and are referenced here to support the model choice. For these reasons, the log-linear model is used as the primary inferential model in the report.
+
 ## Main Model Results (log linear)
 
 The final model was fitted on 307 observations, as 2 additional rows were excluded due to missing values in `Fast_charge`. Final coefficient estimates are reported in Table 4. After backward elimination, `Acceleration_0_100` was removed, while `Range`, `Efficiency`, `Top_speed`, and `Fast_charge` were retained as control variables. The adjusted $R^2$ for the final log-price model is 0.8412.
@@ -390,12 +396,6 @@ In contrast, for premium vehicles, the positive interaction indicates that incre
 
 #### Control Variables
 The retained control variables also help explain the pricing patterns. `Range` ($p = 0.0044$), `Top_speed` ($p < 2 \times 10^{-16}$), and `Efficiency` ($p < 0.001$) each contribute information beyond battery capacity alone, indicating that the market values a broader set of performance characteristics. Their inclusion also helps explain why the adjusted coefficient for battery capacity is much smaller than the simple within-segment slopes reported in Table 2.
-
-## Diagnostics and Model Selection
-
-Initial diagnostics of the untransformed price model revealed meaningful departures from the linear-model assumptions. As shown in Appendix Figure 3, the residual-versus-fitted plot displayed increasing spread as fitted values increased, and the Q-Q plot showed a heavy upper tail, indicating heteroscedasticity and right-skewness in price. In addition, several technical variables (e.g., Battery and Range) were found to be highly correlated, raising concerns about multicollinearity and motivating careful variable selection.
-
-The log transformation of price reduced these problems and improved model fit, with adjusted $R^2$ increasing from 0.7313 to 0.8412. Some mild upper-tail deviation remains in the Q-Q plot after transformation, but it is not severe enough to overturn the main inferential conclusions. These diagnostic plots are provided in Appendix Figure 3 and are referenced here to support the model choice. For these reasons, the log-linear model is used as the primary inferential model in the report.
 
 
 # Discussion and Conclusion
