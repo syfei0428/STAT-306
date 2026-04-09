@@ -80,7 +80,7 @@ cat("--- Missing-price comparison ---\n")
 print(missing_price_comparison)
 cat("\n")
 
-# --- Missing Value Deep Dive ---
+# --- Missing value details referenced in the report ---
 
 # 1. Extract all rows with missing Price.DE.
 ev_missing_price <- ev_raw %>%
@@ -252,8 +252,8 @@ cat("\n")
 
 
 # --- 8. Appendix Figure A1: Battery and range distributions ---
-# This figure shows that premium and non-premium vehicles differ not only in
-# center but also in spread for these technical attributes.
+# This figure supports the report's point that premium and non-premium vehicles
+# differ not only in center but also in spread for these technical attributes.
 
 p_bat_app <- ggplot(ev, aes(x = Battery, fill = market_segment)) +
   geom_histogram(binwidth = 10, color = "black", alpha = 0.7) +
@@ -345,10 +345,10 @@ pairs(
 )
 
 
-# --- 11. Backward elimination with required research-question terms kept ---
+# --- 11. Backward elimination with research-question terms kept ---
 # The research-question terms stay in the model throughout selection. Additional
-# candidate variables are checked one at a time with drop1(), and variables with
-# large p-values are removed sequentially.
+# technical variables are checked one at a time with drop1(), and variables with
+# weak evidence are removed sequentially.
 
 backward_keep_required <- function(data, response, required_terms, optional_terms, alpha = 0.05) {
   current_optional <- optional_terms
@@ -419,7 +419,7 @@ par(mfrow = c(1, 1))
 
 # --- 13. Initial full log model and backward refinement used in the report ---
 # The report's model-refinement table is based on the full log-price model
-# before any optional technical variables are removed.
+# before any additional technical variables are removed.
 
 required_terms <- c("Battery", "market_segment", "Battery:market_segment")
 optional_terms <- c("Range", "Efficiency", "Top_speed", "Acceleration_0_100", "Fast_charge")
@@ -494,10 +494,13 @@ cat("\n")
 
 # Big result: after adjustment, the Battery main effect is negative but not
 # significant for non-premium vehicles, while the interaction remains strongly
-# positive and significant, indicating the battery-price relationship differs
-# by segment. With Range in the model, the Battery coefficient reflects only
-# the remaining variation in battery capacity beyond what is already explained
-# by driving range.
+# positive and significant. This matches the report's interpretation that the
+# battery-price relationship is stronger in the premium segment, whereas in the
+# non-premium segment battery capacity does not show a clear independent
+# association with price once related performance variables are already held
+# fixed. With Range in the model, the Battery coefficient reflects only the
+# remaining variation in battery capacity beyond what is already explained by
+# driving range.
 coef_mat <- summary(final_model)$coefficients
 final_coef_table <- data.frame(
   Estimate = round(coef_mat[, "Estimate"], 4),
@@ -526,7 +529,8 @@ cat("\n")
 # --- 14. Diagnostics reported in the appendix ---
 # Appendix Figure A4 contains the initial raw-price diagnostics. Appendix
 # Figure A5 contains the final log-linear diagnostics, which are improved but
-# still show mild remaining departures.
+# still show mild remaining departures. Appendix Figure A6 shows Cook's
+# distance for the final model.
 
 cat("--- Appendix Figure A4: Initial raw-price diagnostics ---\n")
 par(mfrow = c(2, 2))
