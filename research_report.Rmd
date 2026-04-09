@@ -37,14 +37,19 @@ This page summarizes the main revisions made in response to feedback on the firs
 - Replaced the original price boxplot with a histogram to better display the distribution of vehicle prices.
 - Revised the exploratory-analysis section so the price histogram, summary table, and price-versus-battery plot are the main figures tied to the research question.
 - Added appendix figures showing the distributions of battery capacity and driving range by segment, price against additional technical variables, and broader pairwise relationships among quantitative variables.
-- Reduced the amount of detailed discussion of the simple exploratory regressions and shortened the correlation discussion so it functions mainly as a transition into the multiple-regression analysis.
-
-- Revised the modeling-strategy section to use more formal wording, clarified that the initial raw-price model contains all covariates, and explained the backward partial-F-test procedure more clearly.
+- Added separate appendix diagnostic figures for the initial raw-price full model and the final log-linear model so that the justification for the log transformation and the adequacy of the final model are documented separately.
+- Reduced the amount of detailed discussion of the simple exploratory regressions in Exploratory analysis part and shortened the correlation discussion so it functions mainly as a transition into the multiple-regression analysis.
+- Revised the modeling-strategy section to use more formal wording, clarified that the initial raw-price model contains all covariates, and explained the backward variable-removal procedure more clearly.
+- Reorganized the statistical-analysis section so the initial full model, the reason for the log transformation, the model-refinement step, and the final inferential model are presented in a clearer sequence with less repetition.
+- Added a model-refinement table showing which terms were included in the initial full log-model and which term was removed before reaching the final model.
+- Revised the final regression table to use a standard regression-output layout with estimates, standard errors, test statistics, and p-values.
 - Strengthened the justification for the log transformation by linking it to the right-skewness and heteroscedasticity observed in the exploratory analysis and diagnostics.
+- Revised the main-model-results section so the final table is interpreted in one continuous discussion rather than being split into a separate interpretation subsection.
+- Expanded the final-model interpretation to explain the direction as well as the significance of the key coefficients, including the interaction term, the non-significant battery term, and the positive retained control variables.
 - Expanded the interpretation of the battery and range coefficients to explain why battery capacity is not statistically significant in the adjusted non-premium model and what that coefficient represents after controlling for related variables.
 - Revised the interaction interpretation to focus more clearly on the difference between premium and non-premium pricing patterns.
-- Added clearer references to appendix diagnostics and explained the Cook's distance reference line.
-- Tightened the discussion and conclusion so they align more directly with the final fitted model.
+- Added clearer references to appendix diagnostics, including separate references for the initial raw-price diagnostics and the final-model diagnostics, and explained the Cook's distance reference line.
+- Revised the discussion and conclusion so they follow more naturally from the main model results, remove unnecessary references to simple models, and replace vague wording with more direct interpretation.
 
 \newpage
 \setcounter{page}{1}
@@ -268,7 +273,7 @@ kable(correlation_table, caption = "Correlation matrix for quantitative variable
 
 The study employs a multiple linear regression framework because the response variable is continuous and the goal is inference about average relationships. The model is built around the research-question terms: battery capacity ($Battery$), market segment ($market\_segment$), and their interaction. These terms are retained throughout model selection so that both research questions remain directly addressable. Additional technical variables, including $Range$, $Efficiency$, $Top\_speed$, $Acceleration\_0\_100$, and $Fast\_charge$, are treated as additional candidate variables considered during model selection.
 
-Backward elimination based on partial F-tests (implemented using drop1() in R) is used for the additional candidate variables only. Variables with p-values greater than 0.05 are removed sequentially. This test-based approach is appropriate here because the project focuses on inference rather than prediction. Other criteria such as information criteria could also be considered, but a test-based approach is used here because the emphasis is on retaining variables that contribute inferentially once the research-question terms are fixed. Starting from the full model allows each candidate variable to be assessed while the others are present, and it helps reduce the model to a more interpretable form without removing the terms required by the research questions.
+Backward elimination is used for the additional candidate variables only, implemented with `drop1()` in R. Starting from the full model, variables with large p-values (> 0.05) are removed one at a time while the research-question terms are kept in the model. In particular, battery capacity, market segment, and their interaction remain in the model throughout selection because they are needed to address the two research questions directly. This approach is appropriate here because the project focuses on inference rather than prediction. It also keeps the model easier to interpret while preserving the terms needed to answer the main research questions.
 
 ```{r backward-selection-function, include=FALSE}
 backward_keep_required <- function(data, response, required_terms, optional_terms, alpha = 0.05) {
@@ -316,7 +321,7 @@ backward_keep_required <- function(data, response, required_terms, optional_term
 }
 ```
 
-## Initial Model
+## Initial Full Model
 
 ```{r fit-full-model, include=FALSE}
 full_model <- lm(
@@ -328,25 +333,52 @@ full_model <- lm(
 summary(full_model)
 ```
 
-In the raw price model (i.e., the model containing all covariates), the adjusted $R^2$ is approximately 0.7313. However, we must verify if the assumptions of linear regression hold before trusting these results.
+```{r initial-model-summary}
+full_model_glance <- broom::glance(full_model)
 
-## Diagnostic Discovery
+initial_model_table <- data.frame(
+  Measure = c(
+    "Response scale",
+    "Model content",
+    "Observations used",
+    "Observations dropped",
+    "Adjusted R-squared",
+    "Residual standard error",
+    "Overall model p-value"
+  ),
+  Summary = c(
+    "Price in EUR",
+    "Full model with all candidate covariates",
+    nobs(full_model),
+    nrow(ev) - nobs(full_model),
+    round(full_model_glance$adj.r.squared, 4),
+    round(full_model_glance$sigma, 0),
+    format(full_model_glance$p.value, scientific = TRUE, digits = 2)
+  ),
+  check.names = FALSE
+)
 
-A systematic review of the initial raw-price model's diagnostics revealed critical violations of Gauss-Markov assumptions:
+kable(
+  initial_model_table,
+  caption = "Summary of the initial raw-price model"
+)
+```
 
-- Heteroscedasticity: The "Residuals vs Fitted" plot displayed a prominent fan-shaped pattern, indicating that the error variance increases as the predicted price rises.
+Table 4 summarizes the initial raw-price model, meaning the model fitted on the original price scale with all candidate covariates included. Specifically, it contains the three research-question terms (battery capacity, market segment, and their interaction) together with five additional technical variables: driving range, energy efficiency, top speed, acceleration, and fast-charging speed. Because `Fast_charge` is part of this full model, the two observations with missing fast-charging speed are omitted automatically, leaving 307 observations for estimation. This model explains a substantial share of the observed variation in price (adjusted $R^2 = 0.7313$), but that alone is not enough to justify interpretation. It serves mainly as the starting point for diagnostics and model refinement rather than as the final inferential model.
 
-- Non-Normality: The Normal Q-Q plot exhibited a heavy upper tail, suggesting the residuals are right-skewed—a common trait in monetary datasets where high-end outliers are present.
+## Model Refinement and Selection
 
-Because these violations could lead to unstable coefficient estimates and unreliable p-values, we transition to a log-linear framework to stabilize the variance.
-
-## Model Refinement: Log-Transformation
-
-To address the heteroscedasticity and the right-skewness observed in the exploratory analysis, we applied a natural log transformation ($log(Price)$). The backward-elimination procedure was then repeated using the log-transformed response.
+Figure 1 shows that price is right-skewed, especially in the premium segment. Consistent with that pattern, Appendix Figure A4 shows that the raw-price full model has increasing residual spread in the residuals-versus-fitted plot and a heavy upper tail in the Q-Q plot. Together, these features indicate that the model on the original price scale does not satisfy the constant-variance and approximate-normality assumptions well. For that reason, a natural log transformation of price was used before model refinement. Starting from the same full set of terms, the additional technical variables were then checked one at a time and removed only when their evidence was weak, while battery capacity, market segment, and their interaction were kept in the model throughout because they are needed to answer the two research questions directly.
 
 ```{r run-backward-selection, include=FALSE}
 required_terms <- c("Battery", "market_segment", "Battery:market_segment")
 optional_terms <- c("Range", "Efficiency", "Top_speed", "Acceleration_0_100", "Fast_charge")
+
+initial_log_full_model <- lm(
+  log(Price.DE.) ~ Battery * market_segment +
+    Range + Efficiency + Top_speed + Acceleration_0_100 + Fast_charge,
+  data = ev
+)
 
 selection_results <- backward_keep_required(
   data = ev,
@@ -363,51 +395,121 @@ final_model <- selection_results$final_model
 summary(final_model)
 ```
 
+```{r model-transition-table, include=FALSE}
+format_p_value <- function(x) {
+  ifelse(
+    x < 0.001,
+    "<0.001",
+    sprintf("%.4f", x)
+  )
+}
 
-## Diagnostics and Model Selection
+initial_log_p_values <- summary(initial_log_full_model)$coefficients[, "Pr(>|t|)"]
 
-Initial diagnostics of the untransformed price model revealed meaningful departures from the linear-model assumptions. As shown in Appendix Figure A4, the residual-versus-fitted plot displayed increasing spread as fitted values increased, and the Q-Q plot showed a heavy upper tail, indicating heteroscedasticity and right-skewness in price. In addition, several technical variables (e.g., Battery and Range) were found to be highly correlated, raising concerns about multicollinearity and motivating careful variable selection.
+term_transition_table <- data.frame(
+  Term = c(
+    "Battery capacity",
+    "Premium segment",
+    "Battery capacity x premium segment",
+    "Driving range",
+    "Energy efficiency",
+    "Top speed",
+    "Acceleration (0-100 km/h)",
+    "Fast-charging speed"
+  ),
+  `Initial full log-model p-value` = c(
+    format_p_value(initial_log_p_values["Battery"]),
+    format_p_value(initial_log_p_values["market_segmentPremium"]),
+    format_p_value(initial_log_p_values["Battery:market_segmentPremium"]),
+    format_p_value(initial_log_p_values["Range"]),
+    format_p_value(initial_log_p_values["Efficiency"]),
+    format_p_value(initial_log_p_values["Top_speed"]),
+    format_p_value(initial_log_p_values["Acceleration_0_100"]),
+    format_p_value(initial_log_p_values["Fast_charge"])
+  ),
+  `Final model status` = c(
+    "Retained",
+    "Retained",
+    "Retained",
+    "Retained",
+    "Retained",
+    "Retained",
+    "Removed",
+    "Retained"
+  ),
+  check.names = FALSE
+)
+```
 
-The log transformation of price reduced these problems and improved model fit, with adjusted $R^2$ increasing from 0.7313 to 0.8412. Some mild upper-tail deviation remains in the Q-Q plot after transformation, but it is not severe enough to overturn the main inferential conclusions. These diagnostic plots are provided in Appendix Figure A4 and Appendix Figure A5 and are referenced here to support the model choice. For these reasons, the log-linear model is used as the primary inferential model in the report.
+Table 5 summarizes how each term changed from the initial log-linear full model to the final model.
+
+```{r model-transition-summary}
+kable(
+  term_transition_table,
+  caption = "Terms retained or removed during model refinement",
+  row.names = FALSE
+)
+```
+
+It shows that all three primary terms tied to the research questions were retained throughout model refinement (Table 5). Among the five additional technical variables, only acceleration was removed, while driving range, energy efficiency, top speed, and fast-charging speed remained in the final model. The initial full-model p-values are included only to show which additional variables looked weakest before refinement; the final coefficient estimates and final-model p-values are reported separately in Table 6. The log transformation also improved overall fit, with the adjusted $R^2$ increasing from 0.7313 in the initial full model to 0.8412 in the final log-linear model. Although some mild departures remain, the diagnostic plots in Appendix Figure A5 and the Cook's distance values in Appendix Figure A6 do not indicate problems severe enough to rule out the final log-linear model for inference.
 
 ## Main Model Results (log linear)
 
-The final model was fitted on 307 observations, as 2 additional rows were excluded due to missing values in `Fast_charge`. Final coefficient estimates are reported in Table 4. After backward elimination, `Acceleration_0_100` was removed, while `Range`, `Efficiency`, `Top_speed`, and `Fast_charge` were retained as control variables. The adjusted $R^2$ for the final log-price model is 0.8412.
+The final log-linear model was fitted on 307 observations; the two rows with missing fast-charging speed are omitted because fast-charging speed is retained in the model. Table 6 reports the final coefficient estimates, standard errors, test statistics, and p-values for the retained terms.
 
-In this adjusted model, the coefficient for `Battery` in the baseline non-premium segment is not statistically significant ($p = 0.1517$). This suggests that, once driving range and other performance measures are accounted for, battery capacity by itself is not a key determinant of price in non-premium vehicles. This is plausible given the strong correlation between `Battery` and `Range` ($r = 0.88$). Since `Range` is retained in the model, it captures much of the variation associated with battery capacity, leaving the coefficient for `Battery` to reflect only the remaining variation beyond driving range. In practical terms, once `Range` is already in the model, the battery coefficient asks whether two vehicles with the same range but different battery capacities still differ in price, which is a much narrower question than the simple battery-price relationship. As a result, the model should be interpreted as assessing the association of battery capacity with price after holding constant several related measures of vehicle performance.
+As shown in Table 6, the main result is the positive and highly significant interaction between battery capacity and premium segment ($\beta = 0.0051$, $p < 0.001$). This is the key evidence for the second research question: after the other retained technical variables are held fixed, the battery-price relationship differs between premium and non-premium vehicles. In plain terms, larger batteries are more closely reflected in the prices of premium vehicles than in the prices of non-premium vehicles. The coefficient for `market_segmentPremium` is also statistically significant ($p = 0.0078$), but because the model includes an interaction between battery capacity and market segment, this coefficient represents the segment difference when battery capacity is zero. Since a battery capacity of zero kWh is not meaningful in this context, the coefficient is not interpreted on its own. Instead, the interaction term and the fitted relationship across battery levels are more substantively relevant.
+
 
 ```{r coefficient-table}
-kable(round(summary(final_model)$coefficients, 4),
-      caption = "Coefficient estimates for the final regression model")
+coef_mat <- summary(final_model)$coefficients
+
+final_coef_table <- data.frame(
+  Estimate = round(coef_mat[, "Estimate"], 4),
+  `Std. Error` = round(coef_mat[, "Std. Error"], 4),
+  `t value` = round(coef_mat[, "t value"], 4),
+  `p-value` = ifelse(
+    coef_mat[, "Pr(>|t|)"] < 0.001,
+    "<0.001",
+    sprintf("%.4f", coef_mat[, "Pr(>|t|)"])
+  ),
+  check.names = FALSE
+)
+
+row.names(final_coef_table) <- c(
+  "(Intercept)",
+  "Battery",
+  "market_segmentPremium",
+  "Range",
+  "Efficiency",
+  "Top_speed",
+  "Fast_charge",
+  "Battery:market_segmentPremium"
+)
+
+kable(
+  final_coef_table,
+  caption = "Coefficient estimates and p-values for the final regression model"
+)
 ```
 
-### Interpretation of Results
 
-#### Interaction Between Battery Capacity and Segment
-The interaction term between `Battery` and `market_segmentPremium` is positive and highly significant ($\beta = 0.0051$, $p < 0.001$), indicating that the relationship between battery capacity and price differs between premium and non-premium vehicles.
-
-In practical terms, this means that battery capacity is more strongly associated with higher prices for premium vehicles than for non-premium vehicles. Even after controlling for other performance-related variables, premium brands tend to place greater value on larger battery capacities, while this effect is much weaker for non-premium vehicles.
-
-For non-premium vehicles, battery capacity is not a statistically significant predictor of price once other factors are accounted for. This suggests that consumers in this segment may care more about overall performance measures (such as range and efficiency) rather than battery size itself.
-
-In contrast, for premium vehicles, the positive interaction indicates that increases in battery capacity are more likely to be reflected in higher prices. Overall, the key takeaway is that the effect of battery capacity on price is not uniform across segments: it plays a more important role in pricing for premium vehicles than for non-premium ones.
-
-#### Control Variables
-The retained control variables also help explain the pricing patterns. `Range` ($p = 0.0044$), `Top_speed` ($p < 2 \times 10^{-16}$), and `Efficiency` ($p < 0.001$) each contribute information beyond battery capacity alone, indicating that the market values a broader set of performance characteristics. Their inclusion also helps explain why the adjusted coefficient for battery capacity is much smaller than the simple within-segment slopes reported in Table 2.
+Table 6 also shows that the coefficient for battery capacity in the baseline non-premium segment is negative, but not statistically significant ($p = 0.1517$). This does not make battery capacity irrelevant; rather, it means that once driving range and other related performance measures are already in the model, battery capacity by itself does not show a clear additional association with price for non-premium vehicles. This is plausible because battery capacity is strongly correlated with driving range ($r = 0.88$, Table 3), so much of the simple battery-price pattern is shared with other technical measures. In practical terms, once range is already in the model, the battery coefficient asks whether two vehicles with the same range but different battery capacities still differ in price, which is a much narrower question than the simple battery-price relationship. The retained control variables also matter: the coefficients for range, efficiency, top speed, and fast-charging speed are all positive, and each is statistically significant, indicating that vehicles with longer range, higher efficiency values, higher top speed, and faster charging tend to have higher prices after the other retained terms are held fixed. This pattern shows that EV prices reflect a broader bundle of performance characteristics rather than battery capacity alone. This is also why acceleration was removed during refinement: among the additional technical variables, it showed the weakest evidence once the other performance-related terms were already in the model.
 
 
 # Discussion and Conclusion
 
 ## Discussion
-Taken together, the exploratory and regression results suggest that battery capacity is associated with EV price, but that relationship depends on how price is modeled and which other technical variables are held fixed. In the adjusted log-linear model, much of the association between battery capacity and price is explained by other correlated performance measures such as range and top speed. As a result, the battery coefficient is not statistically significant for non-premium vehicles, while the positive interaction term indicates that the battery–price relationship remains stronger in the premium segment.
+Taken together, the results suggest that EV prices are shaped by a bundle of related technical characteristics rather than by battery capacity alone. In the non-premium segment (the baseline group), battery capacity does not show a clear independent association with price once other performance variables are included, suggesting that its effect is largely captured through measures such as range.
 
-This pattern is consistent with the idea that EV prices reflect a bundle of related technical characteristics rather than battery capacity alone. For non-premium vehicles in particular, battery size may matter mainly through the performance outcomes it helps produce, such as longer range or higher speed, rather than as an independently priced feature. For premium vehicles, the positive interaction suggests that battery capacity is more closely aligned with pricing even after controlling for those related characteristics, although the adjusted premium slope itself is small in the final model.
+In contrast, the positive and significant interaction term indicates that the association between battery capacity and price is stronger in the premium segment. Because the main battery coefficient represents the effect in the non-premium segment, the interaction term captures how this relationship changes for premium vehicles. Together, these results indicate that the battery–price relationship is weak in the non-premium segment but becomes stronger in the premium segment. More specifically, battery capacity is associated with a larger increase in price for premium vehicles, suggesting that increases in battery size translate more directly into higher prices in this segment, even after controlling for other technical characteristics.
+
+Overall, these findings indicate that EV pricing reflects a combination of performance attributes, and that the importance of battery capacity varies across market segments. One possible explanation is that premium consumers may place additional value on battery capacity itself, beyond the performance outcomes it enables.
 
 ## Limitations
 Several limitations should be kept in mind. First, the dataset is an observational snapshot of EV models listed in EV Database and does not represent all EVs sold in Germany or all EVs from a clearly specified year. Second, the premium versus non-premium classification is a simplified grouping based on widely recognized market positioning rather than a formal industry standard. Third, some relevant determinants of price, such as interior quality, software features, or driver-assistance packages, are not recorded in the dataset. Finally, because 51 observations had missing prices and were excluded, some risk of selection bias remains even though the missing-price models do not appear dramatically different on the observed technical variables.
 
 ## Conclusion
-The analysis provides evidence that the association between battery capacity and EV price differs by market segment. Premium vehicles exhibit a steeper unadjusted battery-price relationship, and the adjusted log-linear model also indicates a significant difference between premium and non-premium segments through the interaction term. At the same time, the final model shows that battery capacity alone does not have a clear independent association with price for non-premium vehicles once other related technical variables are held constant. Overall, the results suggest that EV pricing reflects both battery capacity and broader performance characteristics, and that these relationships are not the same across manufacturer segments.
+The analysis provides evidence that battery capacity is associated with EV price, but that the relationship differs by market segment. After adjustment for other retained technical variables, battery capacity does not have a clear independent association with price for non-premium vehicles, whereas the significant positive interaction term shows that the battery-price relationship remains stronger in the premium segment. Overall, the findings suggest that EV pricing reflects both battery capacity and broader performance characteristics, and that these relationships are not the same across manufacturer segments.
 
 # Statement of AI Use
 
@@ -419,6 +521,9 @@ Representative prompts used:
 2. "Help update the data-preparation description so it accurately reflects the raw dataset, missing values, and derived variables used in the analysis."
 3. "Help strengthen the wording in response to feedback on interaction interpretation, diagnostics, model selection, and limitations."
 4. "Help move less essential material to the appendix so the main body remains concise and within the page limit."
+5. "Help revise the discussion and conclusion so they align with the final fitted model and avoid vague wording."
+6. "Help update table and figure references so the report reads more like a polished paper and less like an analysis notebook."
+
 
 \newpage
 
@@ -542,6 +647,20 @@ The scatterplot matrix in Appendix Figure A3 is mainly helpful for visually chec
 \begin{center}
 \textbf{Figure A4}
 
+\textbf{Diagnostic Plots for the Initial Raw-Price Full Model}
+\end{center}
+
+```{r appendix-initial-diagnostics}
+par(mfrow = c(2, 2))
+plot(full_model)
+par(mfrow = c(1, 1))
+```
+
+\clearpage
+
+\begin{center}
+\textbf{Figure A5}
+
 \textbf{Diagnostic Plots for the Selected Regression Model}
 \end{center}
 
@@ -554,7 +673,7 @@ par(mfrow = c(1, 1))
 \clearpage
 
 \begin{center}
-\textbf{Figure A5}
+\textbf{Figure A6}
 
 \textbf{Cook's Distance for the Selected Regression Model}
 \end{center}

@@ -1,6 +1,7 @@
 library(dplyr)
 library(ggplot2)
 library(broom)
+library(patchwork)
 
 
 # --- 1. Data import and cleaning ---
@@ -164,25 +165,21 @@ cat("\n")
 
 
 # --- 5. Exploratory plots used in the report ---
-# Figure 1 in the report is now a histogram rather than a boxplot because it
+# Figure 1 in the report is a histogram rather than a boxplot because it
 # displays right-skewness more directly for the price distribution.
 
 price_histogram <- ggplot(ev, aes(x = Price.DE., fill = market_segment)) +
   geom_histogram(binwidth = 5000, color = "black", alpha = 0.7) +
   theme_bw() +
   scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
-  facet_wrap(~market_segment, ncol = 1) +
+  facet_wrap(~market_segment, ncol = 2) +
   labs(
-    title = "Distribution of EV Prices by Market Segment",
-    subtitle = "Histogram showing price frequency (Bin width = 5000 EUR)",
     x = "Price (Euro)",
-    y = "Count / Frequency",
+    y = "Frequency",
     fill = "Market Segment"
   ) +
   theme(
     legend.position = "none",
-    plot.title = element_text(face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(hjust = 0.5),
     strip.background = element_rect(fill = "gray90"), 
     strip.text = element_text(face = "bold")
   )
@@ -254,9 +251,104 @@ print(correlation_table)
 cat("\n")
 
 
-# --- 8. Backward elimination with required research-question terms kept ---
+# --- 8. Appendix Figure A1: Battery and range distributions ---
+# This figure shows that premium and non-premium vehicles differ not only in
+# center but also in spread for these technical attributes.
+
+p_bat_app <- ggplot(ev, aes(x = Battery, fill = market_segment)) +
+  geom_histogram(binwidth = 10, color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
+  theme_bw() +
+  facet_wrap(~market_segment, ncol = 1) +
+  labs(title = "(a) Battery Capacity (kWh)", x = "Battery (kWh)", y = "Count") +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+p_rng_app <- ggplot(ev, aes(x = Range, fill = market_segment)) +
+  geom_histogram(binwidth = 50, color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
+  theme_bw() +
+  facet_wrap(~market_segment, ncol = 1) +
+  labs(title = "(b) Driving Range (km)", x = "Range (km)", y = "Count") +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+p_bat_app + p_rng_app +
+  plot_annotation(
+    title = "Appendix Figure A1: Battery Capacity and Driving Range by Segment",
+    theme = theme(plot.title = element_text(face = "bold", hjust = 0.5))
+  )
+
+
+# --- 9. Appendix Figure A2: Price versus additional technical variables ---
+# These plots extend the exploratory analysis beyond Battery by showing how
+# Price relates to Range, Efficiency, Top_speed, and Acceleration_0_100.
+
+p_range <- ggplot(ev, aes(x = Range, y = Price.DE., color = market_segment)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "(a) Price vs. Driving Range", x = "Driving range (km)", y = "Price (EUR)") +
+  theme_bw() +
+  theme(legend.position = "bottom", plot.title = element_text(size = 10))
+
+p_eff <- ggplot(ev, aes(x = Efficiency, y = Price.DE., color = market_segment)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "(b) Price vs. Energy Efficiency", x = "Efficiency (Wh/km)", y = "Price (EUR)") +
+  theme_bw() +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+p_speed <- ggplot(ev, aes(x = Top_speed, y = Price.DE., color = market_segment)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "(c) Price vs. Top Speed", x = "Top speed (km/h)", y = "Price (EUR)") +
+  theme_bw() +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+p_accel <- ggplot(ev, aes(x = Acceleration_0_100, y = Price.DE., color = market_segment)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "(d) Price vs. Acceleration", x = "0-100 km/h time (s)", y = "Price (EUR)") +
+  theme_bw() +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+(p_range + p_eff) / (p_speed + p_accel)
+
+
+# --- 10. Appendix Figure A3: Pairwise plot used in the appendix ---
+# This supports the report's discussion of overlap among Battery, Range,
+# Top_speed, and Fast_charge.
+
+pairs_data <- ev %>%
+  select(
+    Price.DE.,
+    Battery,
+    Range,
+    Efficiency,
+    Top_speed,
+    Acceleration_0_100,
+    Fast_charge
+  )
+
+colnames(pairs_data) <- c(
+  "Price",
+  "Battery",
+  "Range",
+  "Efficiency",
+  "Top speed",
+  "0-100 accel",
+  "Fast charge"
+)
+
+pairs(
+  pairs_data,
+  pch = 19,
+  cex = 0.5
+)
+
+
+# --- 11. Backward elimination with required research-question terms kept ---
 # The research-question terms stay in the model throughout selection. Additional
-# candidate variables are tested with partial F-tests using drop1().
+# candidate variables are checked one at a time with drop1(), and variables with
+# large p-values are removed sequentially.
 
 backward_keep_required <- function(data, response, required_terms, optional_terms, alpha = 0.05) {
   current_optional <- optional_terms
@@ -303,7 +395,7 @@ backward_keep_required <- function(data, response, required_terms, optional_term
 }
 
 
-# --- 9. Initial raw-price model and diagnostics ---
+# --- 12. Initial raw-price model and diagnostics ---
 # This is the full model containing all covariates before transformation and
 # model simplification.
 
@@ -317,18 +409,26 @@ cat("--- Initial raw-price model ---\n")
 print(summary(full_model))
 cat("\n")
 
-# Big result: the raw-price model shows heteroscedasticity and a heavy upper tail,
-# which motivates the log transformation used in the report. The report also
-# notes that the exploratory histograms show right-skewness in price.
+# Big result: the raw-price model shows increasing residual spread and a heavy
+# upper tail in the Q-Q plot. Together with the right-skewed price histogram,
+# this motivates the log transformation used in the report.
 par(mfrow = c(2, 2))
 plot(full_model)
 par(mfrow = c(1, 1))
 
 
-# --- 10. Final log-price model used in the report ---
+# --- 13. Initial full log model and backward refinement used in the report ---
+# The report's model-refinement table is based on the full log-price model
+# before any optional technical variables are removed.
 
 required_terms <- c("Battery", "market_segment", "Battery:market_segment")
 optional_terms <- c("Range", "Efficiency", "Top_speed", "Acceleration_0_100", "Fast_charge")
+
+initial_log_full_model <- lm(
+  log(Price.DE.) ~ Battery * market_segment +
+    Range + Efficiency + Top_speed + Acceleration_0_100 + Fast_charge,
+  data = ev
+)
 
 selection_results <- backward_keep_required(
   data = ev,
@@ -340,6 +440,10 @@ selection_results <- backward_keep_required(
 
 final_model <- selection_results$final_model
 
+cat("--- Initial full log-price model ---\n")
+print(summary(initial_log_full_model))
+cat("\n")
+
 cat("--- Final log-price model ---\n")
 cat("Kept optional terms:\n")
 print(selection_results$kept_optional_terms)
@@ -349,26 +453,92 @@ cat("\n")
 print(summary(final_model))
 cat("\n")
 
-# Big result: after adjustment, the Battery main effect is not significant for
-# non-premium vehicles, but the interaction remains strongly significant,
-# indicating the battery-price relationship differs by segment. With Range in
-# the model, the Battery coefficient reflects only the remaining variation in
-# battery capacity beyond what is already explained by driving range.
-final_coef_table <- tidy(final_model)
+# Table 5 in the report summarizes which terms were retained or removed during
+# refinement on the log-price scale.
+format_p_value <- function(x) {
+  ifelse(x < 0.001, "<0.001", sprintf("%.4f", x))
+}
 
-cat("--- Table 4: Final model coefficients ---\n")
+initial_log_p_values <- summary(initial_log_full_model)$coefficients[, "Pr(>|t|)"]
+
+term_transition_table <- data.frame(
+  Term = c(
+    "Battery capacity",
+    "Premium segment",
+    "Battery capacity x premium segment",
+    "Driving range",
+    "Energy efficiency",
+    "Top speed",
+    "Acceleration (0-100 km/h)",
+    "Fast-charging speed"
+  ),
+  initial_full_log_model_p_value = c(
+    format_p_value(initial_log_p_values["Battery"]),
+    format_p_value(initial_log_p_values["market_segmentPremium"]),
+    format_p_value(initial_log_p_values["Battery:market_segmentPremium"]),
+    format_p_value(initial_log_p_values["Range"]),
+    format_p_value(initial_log_p_values["Efficiency"]),
+    format_p_value(initial_log_p_values["Top_speed"]),
+    format_p_value(initial_log_p_values["Acceleration_0_100"]),
+    format_p_value(initial_log_p_values["Fast_charge"])
+  ),
+  final_model_status = c(
+    "Retained", "Retained", "Retained", "Retained",
+    "Retained", "Retained", "Removed", "Retained"
+  )
+)
+
+cat("--- Table 5: Terms retained or removed during model refinement ---\n")
+print(term_transition_table)
+cat("\n")
+
+# Big result: after adjustment, the Battery main effect is negative but not
+# significant for non-premium vehicles, while the interaction remains strongly
+# positive and significant, indicating the battery-price relationship differs
+# by segment. With Range in the model, the Battery coefficient reflects only
+# the remaining variation in battery capacity beyond what is already explained
+# by driving range.
+coef_mat <- summary(final_model)$coefficients
+final_coef_table <- data.frame(
+  Estimate = round(coef_mat[, "Estimate"], 4),
+  Std_Error = round(coef_mat[, "Std. Error"], 4),
+  t_value = round(coef_mat[, "t value"], 4),
+  p_value = ifelse(coef_mat[, "Pr(>|t|)"] < 0.001, "<0.001",
+                   sprintf("%.4f", coef_mat[, "Pr(>|t|)"]))
+)
+
+row.names(final_coef_table) <- c(
+  "(Intercept)",
+  "Battery",
+  "market_segmentPremium",
+  "Range",
+  "Efficiency",
+  "Top_speed",
+  "Fast_charge",
+  "Battery:market_segmentPremium"
+)
+
+cat("--- Table 6: Final model coefficients ---\n")
 print(final_coef_table)
 cat("\n")
 
 
-# --- 11. Final model diagnostics reported in the appendix ---
-# Big result: the log transformation improves the diagnostics, although some
-# mild upper-tail deviation may remain in the Q-Q plot.
+# --- 14. Diagnostics reported in the appendix ---
+# Appendix Figure A4 contains the initial raw-price diagnostics. Appendix
+# Figure A5 contains the final log-linear diagnostics, which are improved but
+# still show mild remaining departures.
 
+cat("--- Appendix Figure A4: Initial raw-price diagnostics ---\n")
+par(mfrow = c(2, 2))
+plot(full_model)
+par(mfrow = c(1, 1))
+
+cat("--- Appendix Figure A5: Final log-linear diagnostics ---\n")
 par(mfrow = c(2, 2))
 plot(final_model)
 par(mfrow = c(1, 1))
 
+cat("--- Appendix Figure A6: Cook's distance for final model ---\n")
 plot(
   cooks.distance(final_model),
   type = "h",
@@ -376,65 +546,3 @@ plot(
   ylab = "Cook's distance"
 )
 abline(h = 4 / nrow(ev), col = "red", lty = 2)
-
-
-# --- 12. Pairwise plot used in the appendix ---
-# This supports the report's discussion of overlap among Battery, Range,
-# Top_speed, and Fast_charge.
-
-pairs_data <- ev %>%
-  select(
-    Price.DE.,
-    Battery,
-    Range,
-    Efficiency,
-    Top_speed,
-    Acceleration_0_100,
-    Fast_charge
-  )
-
-colnames(pairs_data) <- c(
-  "Price",
-  "Battery",
-  "Range",
-  "Efficiency",
-  "Top speed",
-  "0-100 accel",
-  "Fast charge"
-)
-
-pairs(
-  pairs_data,
-  pch = 19,
-  cex = 0.5
-)
-
-# --- 13. Histogram of Battery and Range Distributions in Appendix ---
-# Appendix Figure 6 was added in the revised report to show how premium and
-# non-premium vehicles differ in the distributions of battery capacity and
-# driving range.
-
-library(patchwork)
-
-# Battery Plot
-p_bat_app <- ggplot(ev, aes(x = Battery, fill = market_segment)) +
-  geom_histogram(binwidth = 10, color = "black", alpha = 0.7) +
-  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
-  theme_bw() +
-  facet_wrap(~market_segment, ncol = 1) +
-  labs(title = "(a) Battery Capacity (kWh)", x = "Battery (kWh)", y = "Count") +
-  theme(legend.position = "none", plot.title = element_text(size = 10))
-
-# Range Plot
-p_rng_app <- ggplot(ev, aes(x = Range, fill = market_segment)) +
-  geom_histogram(binwidth = 50, color = "black", alpha = 0.7) +
-  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
-  theme_bw() +
-  facet_wrap(~market_segment, ncol = 1) +
-  labs(title = "(b) Driving Range (km)", x = "Range (km)", y = "Count") +
-  theme(legend.position = "none", plot.title = element_text(size = 10))
-
-
-p_bat_app + p_rng_app + 
-  plot_annotation(title = "Appendix Figure 6: Histograms of Battery Capacity and Range by Segment",
-                  theme = theme(plot.title = element_text(face = "bold", hjust = 0.5)))
