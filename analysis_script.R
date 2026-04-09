@@ -5,6 +5,10 @@ library(broom)
 
 # --- 1. Data import and cleaning ---
 
+# The raw dataset is stored locally in the project folder as data/EV_cars.csv.
+# Using a project-relative path makes the analysis reproducible for all group
+# members and avoids machine-specific paths such as ~/Desktop/...
+
 data_path <- "data/EV_cars.csv"
 premium_brands <- c("Tesla", "BMW", "Audi", "Mercedes-Benz", "Mercedes", "Porsche")
 
@@ -43,9 +47,14 @@ cat("Rows in analysis data:", nrow(ev), "\n")
 cat("Missing prices in raw data:", sum(is.na(ev_raw$Price.DE.)), "\n")
 cat("Missing Fast_charge in analysis data:", sum(is.na(ev$Fast_charge)), "\n\n")
 
+# This extraction rule was checked manually in the report workflow.
+# Multi-word brands such as Mercedes-Benz are corrected explicitly above.
+
 
 # --- 2. Missing-price check used in the report ---
 # Compare observed technical variables between rows with and without listed prices.
+# In the report, this supports the claim that the missing-price rows do not look
+# dramatically different on the observed technical variables.
 
 ev_missing_check <- ev_raw %>%
   mutate(
@@ -99,6 +108,9 @@ ev_missing_price %>%
   print()
 
 # 4. Extract rows with missing Fast_charge
+# These are kept in the cleaned dataset and only dropped from models that use
+# Fast_charge. The report notes that these two rows are not extreme on battery
+# capacity or price, so excluding them is unlikely to materially change results.
 cat("\n--- Observations with Missing Fast_charge (n =",
     sum(is.na(ev_raw$Fast_charge)), ") ---\n")
 ev_raw %>%
@@ -107,6 +119,8 @@ ev_raw %>%
   print()
 
 # --- 3. Duplicate-name check mentioned in the report ---
+# Repeated car names were retained because they are not exact duplicate rows and
+# often appear to represent updated listings or distinct configurations.
 
 duplicate_names <- ev %>%
   count(Car_name) %>%
@@ -150,6 +164,8 @@ cat("\n")
 
 
 # --- 5. Exploratory plots used in the report ---
+# Figure 1 in the report is now a histogram rather than a boxplot because it
+# displays right-skewness more directly for the price distribution.
 
 price_histogram <- ggplot(ev, aes(x = Price.DE., fill = market_segment)) +
   geom_histogram(binwidth = 5000, color = "black", alpha = 0.7) +
@@ -239,6 +255,8 @@ cat("\n")
 
 
 # --- 8. Backward elimination with required research-question terms kept ---
+# The research-question terms stay in the model throughout selection. Additional
+# candidate variables are tested with partial F-tests using drop1().
 
 backward_keep_required <- function(data, response, required_terms, optional_terms, alpha = 0.05) {
   current_optional <- optional_terms
@@ -286,6 +304,8 @@ backward_keep_required <- function(data, response, required_terms, optional_term
 
 
 # --- 9. Initial raw-price model and diagnostics ---
+# This is the full model containing all covariates before transformation and
+# model simplification.
 
 full_model <- lm(
   Price.DE. ~ Battery * market_segment +
@@ -298,7 +318,8 @@ print(summary(full_model))
 cat("\n")
 
 # Big result: the raw-price model shows heteroscedasticity and a heavy upper tail,
-# which motivates the log transformation used in the report.
+# which motivates the log transformation used in the report. The report also
+# notes that the exploratory histograms show right-skewness in price.
 par(mfrow = c(2, 2))
 plot(full_model)
 par(mfrow = c(1, 1))
@@ -330,7 +351,9 @@ cat("\n")
 
 # Big result: after adjustment, the Battery main effect is not significant for
 # non-premium vehicles, but the interaction remains strongly significant,
-# indicating the battery-price relationship differs by segment.
+# indicating the battery-price relationship differs by segment. With Range in
+# the model, the Battery coefficient reflects only the remaining variation in
+# battery capacity beyond what is already explained by driving range.
 final_coef_table <- tidy(final_model)
 
 cat("--- Table 4: Final model coefficients ---\n")
@@ -356,6 +379,8 @@ abline(h = 4 / nrow(ev), col = "red", lty = 2)
 
 
 # --- 12. Pairwise plot used in the appendix ---
+# This supports the report's discussion of overlap among Battery, Range,
+# Top_speed, and Fast_charge.
 
 pairs_data <- ev %>%
   select(
@@ -385,6 +410,9 @@ pairs(
 )
 
 # --- 13. Histogram of Battery and Range Distributions in Appendix ---
+# Appendix Figure 6 was added in the revised report to show how premium and
+# non-premium vehicles differ in the distributions of battery capacity and
+# driving range.
 
 library(patchwork)
 

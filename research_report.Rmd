@@ -26,14 +26,19 @@ knitr::opts_chunk$set(
 
 # Summary of Revisions Since Draft 1
 
-This page summarizes the main revisions made in response to feedback on the first draft. It is included separately from the main report.
+This page summarizes the main revisions made in response to feedback on the first draft. 
 
 - Revised the introduction to describe variables in substantive terms rather than primarily by code-style variable names.
 - Clarified the data source, snapshot nature of the dataset, and observational scope of the study.
+- Removed the report-body note about the local file path and kept that reproducibility detail in the R script instead.
 - Expanded the data-preparation section to explain missing values, including why rows with missing prices were excluded and why the two observations missing fast-charging speed are unlikely to affect the fitted models materially.
 - Added a note that extracted manufacturer names were manually checked after cleaning.
+- Added justification that repeated model names appear to be distinct listings or configurations, so retaining them does not appear to directly violate the working independence assumption.
 - Replaced the original price boxplot with a histogram to better display the distribution of vehicle prices.
-- Added appendix figures showing broader pairwise relationships and the distributions of battery capacity and driving range by segment.
+- Revised the exploratory-analysis section so the price histogram, summary table, and price-versus-battery plot are the main figures tied to the research question.
+- Added appendix figures showing the distributions of battery capacity and driving range by segment, price against additional technical variables, and broader pairwise relationships among quantitative variables.
+- Reduced the amount of detailed discussion of the simple exploratory regressions and shortened the correlation discussion so it functions mainly as a transition into the multiple-regression analysis.
+
 - Revised the modeling-strategy section to use more formal wording, clarified that the initial raw-price model contains all covariates, and explained the backward partial-F-test procedure more clearly.
 - Strengthened the justification for the log transformation by linking it to the right-skewness and heteroscedasticity observed in the exploratory analysis and diagnostics.
 - Expanded the interpretation of the battery and range coefficients to explain why battery capacity is not statistically significant in the adjusted non-premium model and what that coefficient represents after controlling for related variables.
@@ -168,33 +173,29 @@ kable(
 ```
 The 309 EV models used in the main analysis have a mean listed price of 67,264 EUR and a median price of 56,942 EUR, suggesting some right-skewness caused by a smaller number of high-priced vehicles (Table 1). Battery capacity is more balanced, with a mean of 71.1 kWh and a median of 70.5 kWh. Overall, the summary statistics indicate that price is more variable than battery capacity. Additional grouped summaries, not shown in Table 1, indicate that premium vehicles tend to have both larger batteries and higher listed prices on average than non-premium vehicles. These patterns motivate examining the joint relationship between price, battery capacity, and market segment in the regression analysis.
 
-```{r}
+```{r price-histogram, fig.cap="Distribution of EV prices by market segment", fig.pos="H", fig.width=6.8, fig.height=4.2}
 ggplot(ev, aes(x = Price.DE., fill = market_segment)) +
   geom_histogram(binwidth = 5000, color = "black", alpha = 0.7) +
   theme_bw() +
   scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
-  facet_wrap(~market_segment, ncol = 1) +
+  facet_wrap(~market_segment, ncol = 2) +
   labs(
-    title = "Distribution of EV Prices by Market Segment",
-    subtitle = "Histogram showing price frequency (Bin width = 5000 EUR)",
     x = "Price (Euro)",
-    y = "Count / Frequency",
+    y = "Frequency",
     fill = "Market Segment"
   ) +
   theme(
     legend.position = "none",
-    plot.title = element_text(face = "bold", hjust = 0.5),
-    plot.subtitle = element_text(hjust = 0.5),
     strip.background = element_rect(fill = "gray90"), 
     strip.text = element_text(face = "bold")
   )
 ```
 
-The histogram of vehicle prices provides a detailed visualization of the underlying distribution across different market segments (Figure 1). While the summary statistics in Table 1 point to higher average costs for premium vehicles, the histogram reveals a pronounced right-skew (positive skew) in both categories. This 'long-tail' structure indicates that most EVs are concentrated in the affordable-to-midrange brackets, with a sparse but significant number of high-priced luxury models extending the scale.
+\FloatBarrier
 
-By comparing the two segments, we observe that the Non-premium distribution is tightly peaked, whereas the Premium segment shows a much broader dispersion and a higher frequency of observations in the upper price percentiles. This visual evidence of non-normality and heteroscedasticity strongly motivates the use of a logarithmic transformation for the price variable in our subsequent regression models. 
+The histogram of vehicle prices shows clear right-skewness in both market segments (Figure 1). Most vehicles are concentrated in the lower-to-middle price ranges, with a smaller number of high-priced vehicles extending the upper tail. The premium segment is also more dispersed and shifted toward higher prices than the non-premium segment. These features are consistent with the summary statistics in Table 1 and suggest that a transformation of price may be useful in the regression analysis.
 
-In addition to price, the distributions of key technical indicators—Battery Capacity (kWh) and Driving Range (km)—were examined to understand the physical differences between market segments. While the summary statistics (Table 1) provide a numerical overview, the visual distributions (see Appendix Figure 6) show that premium vehicles not only possess higher means for these variables but also exhibit a significantly broader variance, supporting the need for a segment-stratified analysis.
+Other quantitative variables were also explored to understand how the two segments differ beyond price alone. Appendix Figure A1 shows the distributions of battery capacity and driving range by segment. Premium vehicles tend to have both larger batteries and longer ranges, and their distributions are more spread out than those of non-premium vehicles. Appendix Figure A2 complements this by plotting price against several additional technical variables, showing that price also tends to increase with range and top speed, while lower acceleration times are generally associated with higher prices. These broader exploratory patterns help motivate the later inclusion of multiple technical controls rather than focusing on battery capacity alone.
 
 The main exploratory visualization plots price against battery capacity with separate fitted lines for premium and non-premium manufacturers (Figure 2). This figure directly addresses both research questions by showing both the overall battery-price association and the extent to which that association may differ by market segment.
 
@@ -210,7 +211,7 @@ ggplot(ev, aes(x = Battery, y = Price.DE., color = market_segment)) +
   )
 ```
 
-Separate simple linear regressions of price on battery capacity were fitted within each market segment, and the resulting slope estimates are reported in Table 2. For non-premium vehicles, the estimated increase in price is 896.68 EUR per additional kWh of battery capacity, with a standard error of 57.47. For premium vehicles, the corresponding estimate is substantially larger at 1,355.14 EUR per kWh, with a standard error of 222.63. In both segments, the p-values are smaller than 0.001, indicating strong statistical evidence of a positive association between battery capacity and price. Consistent with the visual pattern in Figure 2, these estimates confirm that while the relationship is positive for both segments, it is noticeably steeper among premium manufacturers. This suggests that, on average, an additional kWh of battery capacity is associated with a larger increase in listed price in the premium segment.
+To complement Figure 2, Table 2 summarizes simple within-segment slopes from separate regressions of price on battery capacity. The estimated relationship is positive in both segments and steeper for premium vehicles, which is consistent with the visual pattern in Figure 2. Because these simple regressions are included only for exploratory comparison, the main inferential conclusions are based on the multiple-regression models developed in the next section.
 
 ```{r, echo=FALSE}
 model_nonpremium <- lm(Price.DE. ~ Battery,
@@ -242,7 +243,7 @@ kable(slope_table,
       caption = "Estimated battery-price relationship by market segment")
 ```
 
-Because several quantitative vehicle characteristics may be related to one another, it is also useful to examine pairwise relationships and correlations. This can help identify potential multicollinearity before model fitting.
+Because several technical variables may measure overlapping aspects of vehicle performance, their pairwise correlations were also examined (Table 3). In particular, battery capacity is highly correlated with driving range (0.88), and top speed is strongly negatively correlated with acceleration time (-0.84). These patterns suggest that some predictors contain overlapping information, which is important to keep in mind when fitting and interpreting the multiple-regression model. Broader pairwise relationships are shown in Appendix Figure A3.
 
 ```{r correlations}
 quant_vars <- ev %>%
@@ -260,9 +261,6 @@ correlation_table <- round(cor(quant_vars, use = "complete.obs"), 2)
 kable(correlation_table, caption = "Correlation matrix for quantitative variables")
 ```
 
-\newpage
-
-Potential multicollinearity can be assessed from the correlation matrix of the main quantitative vehicle characteristics (Table 3). Several strong pairwise relationships are evident. Price is strongly positively correlated with Battery (0.70) and Top_speed (0.76), indicating that more expensive vehicles tend to have larger batteries and higher performance. At the same time, Battery and Range are themselves highly correlated (0.88), suggesting that these variables capture similar underlying information about vehicle capability. In addition, Top_speed and Acceleration_0_100 are strongly negatively correlated (-0.84), reflecting the fact that faster vehicles tend to have lower acceleration times. Overall, these correlations reveal substantial dependence among the technical variables. This suggests that including many of these predictors simultaneously may introduce multicollinearity, which can make regression coefficients unstable and harder to interpret. The broader pairwise relationships among the quantitative variables are shown in Appendix Figure 5.
 
 # Statistical Analysis
 
@@ -368,9 +366,9 @@ summary(final_model)
 
 ## Diagnostics and Model Selection
 
-Initial diagnostics of the untransformed price model revealed meaningful departures from the linear-model assumptions. As shown in Appendix Figure 3, the residual-versus-fitted plot displayed increasing spread as fitted values increased, and the Q-Q plot showed a heavy upper tail, indicating heteroscedasticity and right-skewness in price. In addition, several technical variables (e.g., Battery and Range) were found to be highly correlated, raising concerns about multicollinearity and motivating careful variable selection.
+Initial diagnostics of the untransformed price model revealed meaningful departures from the linear-model assumptions. As shown in Appendix Figure A4, the residual-versus-fitted plot displayed increasing spread as fitted values increased, and the Q-Q plot showed a heavy upper tail, indicating heteroscedasticity and right-skewness in price. In addition, several technical variables (e.g., Battery and Range) were found to be highly correlated, raising concerns about multicollinearity and motivating careful variable selection.
 
-The log transformation of price reduced these problems and improved model fit, with adjusted $R^2$ increasing from 0.7313 to 0.8412. Some mild upper-tail deviation remains in the Q-Q plot after transformation, but it is not severe enough to overturn the main inferential conclusions. These diagnostic plots are provided in Appendix Figure 3 and are referenced here to support the model choice. For these reasons, the log-linear model is used as the primary inferential model in the report.
+The log transformation of price reduced these problems and improved model fit, with adjusted $R^2$ increasing from 0.7313 to 0.8412. Some mild upper-tail deviation remains in the Q-Q plot after transformation, but it is not severe enough to overturn the main inferential conclusions. These diagnostic plots are provided in Appendix Figure A4 and Appendix Figure A5 and are referenced here to support the model choice. For these reasons, the log-linear model is used as the primary inferential model in the report.
 
 ## Main Model Results (log linear)
 
@@ -422,30 +420,93 @@ Representative prompts used:
 3. "Help strengthen the wording in response to feedback on interaction interpretation, diagnostics, model selection, and limitations."
 4. "Help move less essential material to the appendix so the main body remains concise and within the page limit."
 
-# Appendix
+\newpage
 
-## Diagnostic Plots
+\begin{center}
+\textbf{Appendix}
 
-Supporting diagnostic plots are provided in Appendix Figure 3 and Appendix Figure 4. In Appendix Figure 4, the dashed red reference line marks the common heuristic threshold of $4/n$ for Cook's distance.
+\textbf{Supplementary Figures}
+\end{center}
 
-```{r appendix-diagnostics, fig.cap="Diagnostic plots for the selected regression model"}
-par(mfrow = c(2, 2))
-plot(final_model)
-par(mfrow = c(1, 1))
+\begin{center}
+\textbf{Figure A1}
+
+\textbf{Distributions of Battery Capacity and Driving Range by Market Segment}
+\end{center}
+
+```{r appendix-battery-range, fig.width=7, fig.height=7}
+library(patchwork)
+
+p_bat_app <- ggplot(ev, aes(x = Battery, fill = market_segment)) +
+  geom_histogram(binwidth = 10, color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
+  theme_bw() +
+  facet_wrap(~market_segment, ncol = 1) +
+  labs(title = "(a) Battery Capacity", x = "Battery capacity (kWh)", y = "Count") +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+p_rng_app <- ggplot(ev, aes(x = Range, fill = market_segment)) +
+  geom_histogram(binwidth = 50, color = "black", alpha = 0.7) +
+  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
+  theme_bw() +
+  facet_wrap(~market_segment, ncol = 1) +
+  labs(title = "(b) Driving Range", x = "Driving range (km)", y = "Count") +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+p_bat_app + p_rng_app
 ```
 
-```{r appendix-influence, fig.cap="Cook's distance for the selected regression model"}
-plot(cooks.distance(final_model), type = "h",
-     main = "Cook's Distance for Final Model",
-     ylab = "Cook's distance")
-abline(h = 4 / nrow(ev), col = "red", lty = 2)
+\clearpage
+
+\begin{center}
+\textbf{Figure A2}
+
+\textbf{Price versus Additional Technical Variables by Market Segment}
+\end{center}
+
+```{r appendix-additional-exploration, fig.width=7, fig.height=7}
+library(patchwork)
+
+p_range <- ggplot(ev, aes(x = Range, y = Price.DE., color = market_segment)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "(a) Price vs. Driving Range", x = "Driving range (km)", y = "Price (EUR)") +
+  theme_bw() +
+  theme(legend.position = "bottom", plot.title = element_text(size = 10))
+
+p_eff <- ggplot(ev, aes(x = Efficiency, y = Price.DE., color = market_segment)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "(b) Price vs. Energy Efficiency", x = "Efficiency (Wh/km)", y = "Price (EUR)") +
+  theme_bw() +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+p_speed <- ggplot(ev, aes(x = Top_speed, y = Price.DE., color = market_segment)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "(c) Price vs. Top Speed", x = "Top speed (km/h)", y = "Price (EUR)") +
+  theme_bw() +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+p_accel <- ggplot(ev, aes(x = Acceleration_0_100, y = Price.DE., color = market_segment)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "(d) Price vs. Acceleration", x = "0-100 km/h time (s)", y = "Price (EUR)") +
+  theme_bw() +
+  theme(legend.position = "none", plot.title = element_text(size = 10))
+
+(p_range + p_eff) / (p_speed + p_accel)
 ```
 
-## Pairwise Relationships Among Quantitative Variables
+\clearpage
 
-An additional exploratory check of pairwise relationships among the quantitative variables is shown in Appendix Figure 5. This figure is included in the appendix rather than the main body because it is useful for supporting model-building decisions, but it is not the most direct figure for answering the research questions.
+\begin{center}
+\textbf{Figure A3}
 
-```{r pairs-plot, fig.cap="Scatterplot matrix for quantitative variables used in the analysis"}
+\textbf{Scatterplot Matrix for Quantitative Variables Used in the Analysis}
+\end{center}
+
+```{r pairs-plot}
 pairs_data <- ev %>%
   select(
     Price.DE.,
@@ -474,35 +535,35 @@ pairs(
 )
 ```
 
-The scatterplot matrix in Appendix Figure 5 is mainly helpful for visually checking which explanatory variables appear strongly associated with price and which predictors appear highly related to one another. In this dataset, it supports the conclusion that variables such as `Battery`, `Range`, `Top_speed`, and `Fast_charge` share substantial overlap, which helps explain why a simpler final model is preferred.
+The scatterplot matrix in Appendix Figure A3 is mainly helpful for visually checking which explanatory variables appear strongly associated with price and which predictors appear highly related to one another. In this dataset, it supports the conclusion that variables such as `Battery`, `Range`, `Top_speed`, and `Fast_charge` share substantial overlap, which helps explain why a simpler final model is preferred.
 
-## Battery and Range Distributions
-```{r}
-# --- Appendix Figure 6: Battery and Range Distributions ---
-library(patchwork)
+\clearpage
 
-# Battery Plot
-p_bat_app <- ggplot(ev, aes(x = Battery, fill = market_segment)) +
-  geom_histogram(binwidth = 10, color = "black", alpha = 0.7) +
-  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
-  theme_bw() +
-  facet_wrap(~market_segment, ncol = 1) +
-  labs(title = "(a) Battery Capacity (kWh)", x = "Battery (kWh)", y = "Count") +
-  theme(legend.position = "none", plot.title = element_text(size = 10))
+\begin{center}
+\textbf{Figure A4}
 
-# Range Plot
-p_rng_app <- ggplot(ev, aes(x = Range, fill = market_segment)) +
-  geom_histogram(binwidth = 50, color = "black", alpha = 0.7) +
-  scale_fill_manual(values = c("Premium" = "#2c3e50", "Non-premium" = "#e74c3c")) +
-  theme_bw() +
-  facet_wrap(~market_segment, ncol = 1) +
-  labs(title = "(b) Driving Range (km)", x = "Range (km)", y = "Count") +
-  theme(legend.position = "none", plot.title = element_text(size = 10))
+\textbf{Diagnostic Plots for the Selected Regression Model}
+\end{center}
 
+```{r appendix-diagnostics}
+par(mfrow = c(2, 2))
+plot(final_model)
+par(mfrow = c(1, 1))
+```
 
-p_bat_app + p_rng_app + 
-  plot_annotation(title = "Appendix Figure 6: Histograms of Battery Capacity and Range by Segment",
-                  theme = theme(plot.title = element_text(face = "bold", hjust = 0.5)))
+\clearpage
+
+\begin{center}
+\textbf{Figure A5}
+
+\textbf{Cook's Distance for the Selected Regression Model}
+\end{center}
+
+```{r appendix-influence}
+plot(cooks.distance(final_model), type = "h",
+     main = "Cook's Distance for Final Model",
+     ylab = "Cook's distance")
+abline(h = 4 / nrow(ev), col = "red", lty = 2)
 ```
 
 **Code and data submission:** Qianxue Wang
